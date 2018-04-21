@@ -11,22 +11,26 @@ package com.protonmail.sarahszabo.stellaropusconverter;
  *
  * @author Sarah Szabo <PhysicistSarah@Gmail.com>
  */
-public class FFMPEGTimeStamp implements Comparable<FFMPEGTimeStamp> {
+public class StellarFFMPEGTimeStamp implements Comparable<StellarFFMPEGTimeStamp> {
 
     /**
-     * Constructs a new {@link FFMPEGTimeStamp} with the already existing string
-     * timestamp.
+     * Constructs a new {@link StellarFFMPEGTimeStamp} with the already existing
+     * string timestamp. Supports HH:MM:SS, and MM:SS, formats and no others.
      *
      * @param ffmpegTimeStamp The string version of the timestamp
      * @return The newly constructed timestamp
      */
-    public static FFMPEGTimeStamp fromString(String ffmpegTimeStamp) {
+    public static StellarFFMPEGTimeStamp fromString(String ffmpegTimeStamp) {
         String[] times = ffmpegTimeStamp.split(":");
-        if (times.length != 3) {
+        if (times.length != 3 && times.length != 2) {
             throw new IllegalArgumentException("The number of arguments is not 3. Check the way you entered the hours-minutes-seconds");
+        } else if (times.length == 3) {
+            return new StellarFFMPEGTimeStamp(Integer.parseInt(times[0]), Integer.parseInt(times[1]),
+                    Integer.parseInt(times[2]));
+        } else {
+            return new StellarFFMPEGTimeStamp(Integer.parseInt(times[0]), Integer.parseInt(times[1]));
         }
-        return new FFMPEGTimeStamp(Integer.parseInt(times[0]), Integer.parseInt(times[1]),
-                Integer.parseInt(times[2]));
+
     }
 
     private final int hour, minute, second, millisecond;
@@ -37,7 +41,7 @@ public class FFMPEGTimeStamp implements Comparable<FFMPEGTimeStamp> {
      *
      * @param second The timestamp
      */
-    public FFMPEGTimeStamp(int second) {
+    public StellarFFMPEGTimeStamp(int second) {
         this(0, 0, second, 0);
     }
 
@@ -47,7 +51,7 @@ public class FFMPEGTimeStamp implements Comparable<FFMPEGTimeStamp> {
      * @param minute THe number of minutes
      * @param second The seconds
      */
-    public FFMPEGTimeStamp(int minute, int second) {
+    public StellarFFMPEGTimeStamp(int minute, int second) {
         this(0, minute, second, 0);
     }
 
@@ -58,7 +62,7 @@ public class FFMPEGTimeStamp implements Comparable<FFMPEGTimeStamp> {
      * @param minute The minutes
      * @param second The seconds
      */
-    public FFMPEGTimeStamp(int hour, int minute, int second) {
+    public StellarFFMPEGTimeStamp(int hour, int minute, int second) {
         this(hour, minute, second, 0);
     }
 
@@ -70,7 +74,7 @@ public class FFMPEGTimeStamp implements Comparable<FFMPEGTimeStamp> {
      * @param second The number of seconds
      * @param millisecond The number of milliseconds
      */
-    public FFMPEGTimeStamp(int hour, int minute, int second, int millisecond) {
+    public StellarFFMPEGTimeStamp(int hour, int minute, int second, int millisecond) {
         if (hour < 0 || minute < 0 || second < 0 || millisecond < 0) {
             throw new IllegalArgumentException("One of the fields is less than zero!");
         } else if (minute >= 60) {
@@ -107,7 +111,7 @@ public class FFMPEGTimeStamp implements Comparable<FFMPEGTimeStamp> {
     }
 
     @Override
-    public int compareTo(FFMPEGTimeStamp other) {
+    public int compareTo(StellarFFMPEGTimeStamp other) {
         return Double.compare(getAbsoluteTime(), other.getAbsoluteTime());
     }
 

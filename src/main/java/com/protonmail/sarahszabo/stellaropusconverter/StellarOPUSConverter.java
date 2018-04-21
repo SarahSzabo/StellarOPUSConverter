@@ -23,6 +23,18 @@ import java.util.stream.Collectors;
  */
 public class StellarOPUSConverter {
 
+    /**
+     * Gets the default metadata list.
+     *
+     * @return The default list
+     */
+    public static List<String> getDefaultMetadataList() {
+        List<String> metadata = new ArrayList<>(2);
+        metadata.add("Unknown Artist");
+        metadata.add("Unknown Title");
+        return metadata;
+    }
+
     private final String fileName, trueFileName;
     private final Path filePath;
     private final List<String> metadata;
@@ -69,10 +81,10 @@ public class StellarOPUSConverter {
     public void convertToOPUS(String artist, String title) throws IOException {
         copyOP(() -> {
             try {
+                processImage();
                 processOP("ffmpeg", "-i", this.filePath.getFileName().toString(),
                         "-y", "-b:a", "320k", "-metadata", "title=\"" + title,
-                        "-metadata", "artist=" + artist, title + ".opus");
-                processImage();
+                        "-metadata", "artist=" + artist, "-strict", "-2", title + ".opus");
             } catch (InterruptedException | IOException ex) {
                 Logger.getLogger(StellarOPUSConverter.class.getName()).log(Level.SEVERE, null, ex);
             }
@@ -105,8 +117,8 @@ public class StellarOPUSConverter {
      * @param start The start time of the recording window
      * @param end The end of the recording window
      */
-    public void convertToOPUS(FFMPEGTimeStamp start, FFMPEGTimeStamp end) throws IOException {
-        generateMetadata();
+    public void convertToOPUS(StellarFFMPEGTimeStamp start, StellarFFMPEGTimeStamp end) throws IOException {
+        this.metadata.addAll(StellarUI.askUserForArtistTitle());
         convertToOPUS(this.metadata.get(0), this.metadata.get(1), start, end);
     }
 
@@ -122,7 +134,7 @@ public class StellarOPUSConverter {
      * @throws IllegalArgumentException If start or end is not in the specified
      * format, or if start is less than or equal to zero.
      */
-    public void convertToOPUS(String artist, String title, FFMPEGTimeStamp start, FFMPEGTimeStamp end) throws IOException {
+    public void convertToOPUS(String artist, String title, StellarFFMPEGTimeStamp start, StellarFFMPEGTimeStamp end) throws IOException {
         requireNonNullIterated(artist, title, start, end);
         if (artist.isEmpty() || title.isEmpty()) {
             throw new IllegalArgumentException("One of the fields is empty!");
@@ -130,13 +142,18 @@ public class StellarOPUSConverter {
         if (start.compareTo(end) >= 0) {
             throw new IllegalArgumentException("Start is less than or equal to end!");
         }
+        //Were we a part of the constructor chain? If not, set metadata
+        if (!this.metadata.isEmpty()) {
+            this.metadata.add(artist);
+            this.metadata.add(title);
+        }
         //ffmpeg -ss 00:00:24.0 -i 40.mp4 -t 00:01:20.0 -y -b:a 320k 40.opus
         copyOP(() -> {
             try {
                 processImage();
                 processOP("ffmpeg", "-ss", start.getTimestamp(), "-i", this.filePath.getFileName().toString(),
                         "-t", end.getTimestamp(), "-i", this.fileName + ".png", "-y", "-b:a", "320k", "-metadata", "title=" + title,
-                        "-metadata", "artist=" + artist, title + ".opus");
+                        "-metadata", "artist=" + artist, "-strict", "-2", title + ".opus");
             } catch (InterruptedException | IOException ex) {
                 Logger.getLogger(StellarOPUSConverter.class.getName()).log(Level.SEVERE, null, ex);
             }
@@ -175,18 +192,6 @@ public class StellarOPUSConverter {
         } else {
             this.metadata.addAll(getDefaultMetadataList());
         }
-    }
-
-    /**
-     * Gets the default metadata list.
-     *
-     * @return The default list
-     */
-    private List<String> getDefaultMetadataList() {
-        List<String> metadata = new ArrayList<>(2);
-        metadata.add("Unknown Artist");
-        metadata.add("Unknown Title");
-        return metadata;
     }
 
     /**

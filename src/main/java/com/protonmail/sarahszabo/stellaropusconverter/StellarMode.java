@@ -38,8 +38,8 @@ public enum StellarMode {
     LINK_AUTHOR_TIMESTAMPS {
         @Override
         public void start(String... args) {
-            FFMPEGTimeStamp start = FFMPEGTimeStamp.fromString(args[1]),
-                    end = FFMPEGTimeStamp.fromString(args[2]);
+            StellarFFMPEGTimeStamp start = StellarFFMPEGTimeStamp.fromString(args[1]);
+            StellarFFMPEGTimeStamp end = StellarFFMPEGTimeStamp.fromString(args[2]);
             try {
                 StellarOPUSConverter converter = new StellarOPUSConverter(Paths.get(args[0]));
                 converter.convertToOPUS(start, end);
