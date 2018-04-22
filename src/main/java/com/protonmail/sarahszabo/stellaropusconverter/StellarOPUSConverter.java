@@ -6,6 +6,7 @@
 package com.protonmail.sarahszabo.stellaropusconverter;
 
 import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
@@ -103,7 +104,7 @@ public class StellarOPUSConverter {
             try {
                 processImage();
                 processOP("ffmpeg", "-i", this.filePath.getFileName().toString(),
-                        "-y", "-b:a", "320k", "-metadata", "title=\"" + title,
+                        "-y", "-b:a", "320k", "-metadata", "title=" + title,
                         "-metadata", "artist=" + artist, "-strict", "-2", properFileName(title) + ".opus");
             } catch (InterruptedException | IOException ex) {
                 Logger.getLogger(StellarOPUSConverter.class.getName()).log(Level.SEVERE, null, ex);
@@ -182,8 +183,8 @@ public class StellarOPUSConverter {
         copyOP(() -> {
             try {
                 processImage();
-                processOP("ffmpeg", "-ss", start.getTimestamp(), "-i", this.filePath.getFileName().toString(),
-                        "-t", end.getTimestamp(), "-y", "-b:a", "320k", "-metadata", "title=" + title,
+                processOP("ffmpeg", "-i", this.filePath.getFileName().toString(),
+                        "-ss", start.getTimestamp(), "-to", end.getTimestamp(), "-y", "-b:a", "320k", "-metadata", "title=" + title,
                         "-metadata", "artist=" + artist, "-strict", "-2", properFileName(title) + ".opus");
             } catch (InterruptedException | IOException ex) {
                 Logger.getLogger(StellarOPUSConverter.class.getName()).log(Level.SEVERE, null, ex);
@@ -222,7 +223,7 @@ public class StellarOPUSConverter {
             this.metadata.addAll(getListFromRegex("[" + dividers.stream().filter(separator
                     -> this.fileNameNoEXT.matches(".*[" + separator + "+].*")).findFirst().get() + "*]"));
         } else {
-            this.metadata.addAll(getDefaultMetadataList());
+            this.metadata.addAll(StellarUI.askUserForArtistTitle(this.fileNameNoEXT));
         }
     }
 
@@ -290,8 +291,11 @@ public class StellarOPUSConverter {
      */
     private void processImage() throws IOException, InterruptedException {
         //ffmpeg -ss 25 -i input.mp4 -qscale:v 2 -frames:v 1 -huffman optimal output.jpg
-        processOP("ffmpeg", "-ss", "25", "-i", filePath.getFileName().toString(), "-y", "-qscale:v", "2",
+        processOP("ffmpeg", "-ss", "30", "-i", filePath.getFileName().toString(), "-y", "-qscale:v", "2",
                 "-frames:v", "1", "-huffman", "optimal", fileNameNoEXT + ".png");
+        //Remove This Once This Becomes Automated
+        Files.copy(Paths.get(this.diskManager.getTempDirectory().toString(), fileNameNoEXT + ".png"),
+                Paths.get(this.diskManager.getOutputFolder().toString(), fileNameNoEXT + ".png"));
     }
 
     /**

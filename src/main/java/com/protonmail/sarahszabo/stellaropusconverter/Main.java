@@ -41,6 +41,8 @@ public class Main {
             StellarMode.DIRECT_LINK.start(args);
         } else if (args.length == 1 && args[0].equalsIgnoreCase("-G")) {
             StellarMode.GRAPHICAL_FILE_CHOICE_DIRECT_LINKS.start(args);
+        } else if (args.length == 1 && args[0].equalsIgnoreCase("-CL")) {
+            StellarMode.GET_FROM_CLIPBOARD.start(args);
         } else if (args.length == 2) {
             messageThenExit("We don't currently support 2 arguments");
             printHelp();
@@ -69,7 +71,9 @@ public class Main {
         messageThenExit("OPTIONS: \n\n ? = Help "
                 + "\n/home/MyHardDriveFile.mp4 = Convert Selected File to .opus"
                 + "\n/home/MyHardDriveFile.mp4 = 2:5:47 5:0:0 Converts file from 2 hours 5 minutes and 47 seconds to 5 hours to .opus, "
-                + "NOTE: this also works with just the minues/seconds format as well.\n");
+                + "NOTE: this also works with just the minues/seconds format as well.\n"
+                + "-G Graphical File Chooser\n"
+                + "-CL Copy the Selected Files From The Clipboard");
     }
 
     /**

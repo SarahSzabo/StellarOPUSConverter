@@ -19,6 +19,7 @@ import java.util.stream.Collectors;
 import javafx.application.Platform;
 import javafx.embed.swing.JFXPanel;
 import javafx.scene.control.TextInputDialog;
+import javafx.scene.input.Clipboard;
 import javafx.scene.layout.Region;
 import javafx.stage.DirectoryChooser;
 import javafx.stage.FileChooser;
@@ -42,6 +43,28 @@ public class StellarUI {
     }
 
     /**
+     * Gets the files from the clipboard.
+     *
+     * @return The files or null if none
+     */
+    public static List<File> getFilesFromClipboard() {
+        try {
+            BlockingQueue<List<File>> queue = new ArrayBlockingQueue<>(1);
+            Platform.runLater(() -> {
+                try {
+                    queue.put(Clipboard.getSystemClipboard().getFiles());
+                } catch (InterruptedException ex) {
+                    Logger.getLogger(StellarUI.class.getName()).log(Level.SEVERE, null, ex);
+                }
+            });
+            return queue.take();
+        } catch (InterruptedException ex) {
+            Logger.getLogger(StellarUI.class.getName()).log(Level.SEVERE, null, ex);
+        }
+        return null;
+    }
+
+    /**
      * Asks the user for the artist/title combination. By convention, the
      * zeroith element is the artist, and the first is the title. If the user
      * aborts the operations, Unknown Artist/Unknown Title is returned.
@@ -49,11 +72,24 @@ public class StellarUI {
      * @return The list containing the information
      */
     public static List<String> askUserForArtistTitle() {
+        return askUserForArtistTitle(null);
+    }
+
+    /**
+     * Asks the user for the artist/title combination. By convention, the
+     * zeroith element is the artist, and the first is the title. If the user
+     * aborts the operations, Unknown Artist/Unknown Title is returned.
+     *
+     * @param fileName The file name to list on the dialog
+     * @return The list containing the information
+     */
+    public static List<String> askUserForArtistTitle(String fileName) {
         Platform.runLater(() -> {
             try {
                 TextInputDialog dialog = new TextInputDialog("");
                 dialog.setTitle("Stellar OPUS Converter: Enter Artist/Track Title");
-                dialog.setHeaderText("Enter Author/Track Title Like So: Author, Title");
+                dialog.setHeaderText((fileName != null ? ("(" + fileName + ")\n") : "")
+                        + "Enter Author/Track Title Like So: Author, Title");
                 dialog.getDialogPane().setMinSize(Region.USE_PREF_SIZE, Region.USE_PREF_SIZE);
                 ASK_USER_METADATA.put(dialog.showAndWait());
             } catch (InterruptedException ex) {
@@ -69,7 +105,7 @@ public class StellarUI {
                     Platform.runLater(() -> Notifications.create().hideAfter(Duration.seconds(10))
                             .text("Wrong format for Artist, Track Title. Seperate the values using a comma.")
                             .title("Processing Error").showError());
-                    return askUserForArtistTitle();
+                    return askUserForArtistTitle(fileName);
                 }
                 list.addAll(Arrays.asList(elements));
             } else {
@@ -81,7 +117,7 @@ public class StellarUI {
             System.out.println("Interrupted while waiting for user input!");
             list.addAll(StellarOPUSConverter.getDefaultMetadataList());
         }
-        return list;
+        return list.stream().map(string -> string.trim()).collect(Collectors.toList());
     }
 
     /**
