@@ -66,7 +66,7 @@ public enum StellarDiskManager {
      * @param newOutputFolder The path of the output folder
      * @return The new disk manager for this folder
      */
-    public static StellarDiskManager changeOutputFolderNonPermanant(Path newOutputFolder) throws IOException {
+    public static synchronized StellarDiskManager changeOutputFolderNonPermanant(Path newOutputFolder) throws IOException {
         outputFolder = newOutputFolder;
         return DISKMANAGER;
     }
@@ -79,7 +79,7 @@ public enum StellarDiskManager {
      * @return The new disk manager for this folder
      * @throws java.io.IOException If something happened
      */
-    public static StellarDiskManager changeOutputFolder(Path newOutputFolder) throws IOException {
+    public static synchronized StellarDiskManager changeOutputFolder(Path newOutputFolder) throws IOException {
         outputFolder = newOutputFolder;
         ObjectMapper mapper = new ObjectMapper();
         mapper.writeValue(PREVIOUS_CONFIGURATION.toFile(), new PreviousState(newOutputFolder));

@@ -5,11 +5,17 @@
  */
 package com.protonmail.sarahszabo.stellaropusconverter;
 
-import java.io.File;
 import java.io.IOException;
+import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.List;
+import java.util.Optional;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.stream.Collectors;
+import javafx.application.Platform;
 
 /**
  * An interface representing the mode that the converter is in.
@@ -47,10 +53,28 @@ public enum StellarMode {
                 Logger.getLogger(StellarMode.class.getName()).log(Level.SEVERE, null, ex);
             }
         }
-    }, GRAPHICAL_FILE_CHOICE_DIRECT_LINKS {
+    },
+    /**
+     * Used when using graphics mode to directly convert links.
+     */
+    GRAPHICAL_FILE_CHOICE_DIRECT_LINKS {
         @Override
         public void start(String... args) {
-            throw new UnsupportedOperationException("Not supported yet.");
+            Optional<List<Path>> paths = StellarUI.getFiles();
+            if (paths.isPresent()) {
+                List<Path> finalPaths = StellarHyperspace.runConversionTasks(paths.get()).stream().map(future -> {
+                    try {
+                        return future.get();
+                    } catch (InterruptedException | ExecutionException ex) {
+                        Logger.getLogger(StellarMode.class.getName()).log(Level.SEVERE, null, ex);
+                        throw new IllegalStateException("Stellar Mode Interrupted While Waiting for Futures", ex);
+                    }
+                }).collect(Collectors.toList());
+                System.out.println("\n\n\nCompleted Output Files:");
+                finalPaths.stream().forEach(System.out::println);
+            }
+            StellarHyperspace.initiateFalseVacuum();
+            Platform.exit();
         }
     };
 

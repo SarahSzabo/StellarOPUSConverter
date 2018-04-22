@@ -35,7 +35,7 @@ public class StellarOPUSConverter {
         return metadata;
     }
 
-    private final String fileName, trueFileName;
+    private final String fileNameNoEXT, trueFileName;
     private final Path filePath;
     private final List<String> metadata;
     private final StellarDiskManager diskManager;
@@ -52,9 +52,28 @@ public class StellarOPUSConverter {
         this.diskManager = StellarDiskManager.DISKMANAGER;
         //Gets only the file name without extension
         System.out.println(filePath.toAbsolutePath());
-        this.fileName = filePath.getFileName().toString().replaceFirst("[.][^.]+$", "");
-        this.trueFileName = this.fileName + ".opus";
+        this.fileNameNoEXT = filePath.getFileName().toString().replaceFirst("[.][^.]+$", "");
+        this.trueFileName = this.fileNameNoEXT + ".opus";
         this.metadata = new ArrayList<>(2);
+    }
+
+    /**
+     * Gets the proper return file name. Meaning if the title is unknown title,
+     * gets the original title given at construction time. Else returns the
+     * filename from regex analysis. There is no file extension in the returned
+     * filename.
+     *
+     * @return The proper filename
+     */
+    private String properFileName(String title) {
+        //Uppercase First Character of Both Titles
+        String newTitle = title.toUpperCase(), fileName = this.fileNameNoEXT.toUpperCase();
+        if (title.length() >= 2) {
+            newTitle = (title.charAt(0) + "").toUpperCase() + title.substring(1);
+            fileName = (this.fileNameNoEXT.charAt(0) + "").toUpperCase() + this.fileNameNoEXT.substring(1);
+        }
+        return this.metadata.get(1).equalsIgnoreCase(getDefaultMetadataList().get(1))
+                ? fileName : newTitle;
     }
 
     /**
@@ -64,11 +83,11 @@ public class StellarOPUSConverter {
      *
      * @throws IOException If something went wrong
      */
-    public void convertToOPUS() throws IOException {
+    public Path convertToOPUS() throws IOException {
         //ffmpeg -i filename.mp4 -y -b:a 320k fileName.opus
         //Get a Copy of the File Into the Working Directory
         generateMetadata();
-        convertToOPUS(this.metadata.get(0), this.metadata.get(1));
+        return convertToOPUS(this.metadata.get(0), this.metadata.get(1));
     }
 
     /**
@@ -76,19 +95,22 @@ public class StellarOPUSConverter {
      *
      * @param artist The track artist
      * @param title The track title
+     * @return The Path to the converted File
      * @throws IOException If something happened
      */
-    public void convertToOPUS(String artist, String title) throws IOException {
+    public Path convertToOPUS(String artist, String title) throws IOException {
         copyOP(() -> {
             try {
                 processImage();
                 processOP("ffmpeg", "-i", this.filePath.getFileName().toString(),
                         "-y", "-b:a", "320k", "-metadata", "title=\"" + title,
-                        "-metadata", "artist=" + artist, "-strict", "-2", title + ".opus");
+                        "-metadata", "artist=" + artist, "-strict", "-2", properFileName(title) + ".opus");
             } catch (InterruptedException | IOException ex) {
                 Logger.getLogger(StellarOPUSConverter.class.getName()).log(Level.SEVERE, null, ex);
+                System.err.println("Error encountered during conversion");
             }
         });
+        return Paths.get(this.diskManager.getOutputFolder().toString(), title + ".opus");
     }
 
     /**
@@ -102,6 +124,12 @@ public class StellarOPUSConverter {
         return string.matches("\\d\\d:\\d\\d:\\d\\d");
     }
 
+    /**
+     * An iterated version of {@link Objects#requireNonNull(java.lang.Object)}
+     *
+     * @param <T> The type
+     * @param objects The objects to test
+     */
     @SafeVarargs
     private final <T> void requireNonNullIterated(T... objects) {
         for (T t : objects) {
@@ -116,10 +144,12 @@ public class StellarOPUSConverter {
      *
      * @param start The start time of the recording window
      * @param end The end of the recording window
+     * @return The path to the newly created file
+     * @throws java.io.IOException If something happened
      */
-    public void convertToOPUS(StellarFFMPEGTimeStamp start, StellarFFMPEGTimeStamp end) throws IOException {
+    public Path convertToOPUS(StellarFFMPEGTimeStamp start, StellarFFMPEGTimeStamp end) throws IOException {
         this.metadata.addAll(StellarUI.askUserForArtistTitle());
-        convertToOPUS(this.metadata.get(0), this.metadata.get(1), start, end);
+        return convertToOPUS(this.metadata.get(0), this.metadata.get(1), start, end);
     }
 
     /**
@@ -130,11 +160,12 @@ public class StellarOPUSConverter {
      * @param title The track title
      * @param start The starting time
      * @param end The end time
+     * @return The path to the newly created file
      * @throws IOException If something happened
      * @throws IllegalArgumentException If start or end is not in the specified
      * format, or if start is less than or equal to zero.
      */
-    public void convertToOPUS(String artist, String title, StellarFFMPEGTimeStamp start, StellarFFMPEGTimeStamp end) throws IOException {
+    public Path convertToOPUS(String artist, String title, StellarFFMPEGTimeStamp start, StellarFFMPEGTimeStamp end) throws IOException {
         requireNonNullIterated(artist, title, start, end);
         if (artist.isEmpty() || title.isEmpty()) {
             throw new IllegalArgumentException("One of the fields is empty!");
@@ -152,12 +183,13 @@ public class StellarOPUSConverter {
             try {
                 processImage();
                 processOP("ffmpeg", "-ss", start.getTimestamp(), "-i", this.filePath.getFileName().toString(),
-                        "-t", end.getTimestamp(), "-i", this.fileName + ".png", "-y", "-b:a", "320k", "-metadata", "title=" + title,
-                        "-metadata", "artist=" + artist, "-strict", "-2", title + ".opus");
+                        "-t", end.getTimestamp(), "-i", this.fileNameNoEXT + ".png", "-y", "-b:a", "320k", "-metadata", "title=" + title,
+                        "-metadata", "artist=" + artist, "-strict", "-2", properFileName(title) + ".opus");
             } catch (InterruptedException | IOException ex) {
                 Logger.getLogger(StellarOPUSConverter.class.getName()).log(Level.SEVERE, null, ex);
             }
         });
+        return Paths.get(this.diskManager.getOutputFolder().toString(), title + ".opus");
     }
 
     /**
@@ -170,7 +202,7 @@ public class StellarOPUSConverter {
      */
     private List<String> getListFromRegex(String seperator) {
         //Filters out the empty space in returned list and maps it to a list after trimming empty space
-        return Arrays.asList(this.fileName.split(seperator)).stream().filter(string -> !string.isEmpty())
+        return Arrays.asList(this.fileNameNoEXT.split(seperator)).stream().filter(string -> !string.isEmpty())
                 .map(string -> string.trim()).collect(Collectors.toList());
     }
 
@@ -186,9 +218,9 @@ public class StellarOPUSConverter {
      */
     private void generateMetadataFromRegex(String... separators) {
         List<String> dividers = Arrays.asList(separators);
-        if (dividers.stream().anyMatch(separator -> this.fileName.matches(".*[" + separator + "]+.*"))) {
+        if (dividers.stream().anyMatch(separator -> this.fileNameNoEXT.matches(".*[" + separator + "]+.*"))) {
             this.metadata.addAll(getListFromRegex("[" + dividers.stream().filter(separator
-                    -> this.fileName.matches(".*[" + separator + "+].*")).findFirst().get() + "*]"));
+                    -> this.fileNameNoEXT.matches(".*[" + separator + "+].*")).findFirst().get() + "*]"));
         } else {
             this.metadata.addAll(getDefaultMetadataList());
         }
@@ -259,7 +291,7 @@ public class StellarOPUSConverter {
     private void processImage() throws IOException, InterruptedException {
         //ffmpeg -ss 25 -i input.mp4 -qscale:v 2 -frames:v 1 -huffman optimal output.jpg
         processOP("ffmpeg", "-ss", "25", "-i", filePath.getFileName().toString(), "-y", "-qscale:v", "2",
-                "-frames:v", "1", "-huffman", "optimal", fileName + ".png");
+                "-frames:v", "1", "-huffman", "optimal", fileNameNoEXT + ".png");
     }
 
     /**

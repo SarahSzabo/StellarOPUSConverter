@@ -112,14 +112,20 @@ public class StellarUI {
      *
      * @return The files for conversion
      */
-    public static Optional<List<Path>> getFile() {
+    public static Optional<List<Path>> getFiles() {
         FileChooser chooser = new FileChooser();
         chooser.setTitle("Stellar OPUS Converter: Choose Files to Convert to OPUS");
         chooser.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("All Formats", "*.*"));
-        chooser.setSelectedExtensionFilter(new FileChooser.ExtensionFilter("All Video Files", "*.mp4", "*.mkv"));
+        FileChooser.ExtensionFilter videoFilter = new FileChooser.ExtensionFilter("All Video Files (.mp4, .mkv)", "*.mp4", "*.mkv");
+        chooser.getExtensionFilters().add(videoFilter);
+        chooser.setSelectedExtensionFilter(videoFilter);
         Platform.runLater(() -> {
             List<File> files = chooser.showOpenMultipleDialog(null);
             try {
+                if (files == null) {
+                    System.out.println("No Files Chosen, Aborting");
+                    System.exit(0);
+                }
                 PATHS_QUEUE.put(files);
             } catch (InterruptedException ex) {
                 Logger.getLogger(StellarUI.class.getName()).log(Level.SEVERE, null, ex);
