@@ -20,6 +20,7 @@ import javafx.application.Platform;
 import javafx.embed.swing.JFXPanel;
 import javafx.scene.control.TextInputDialog;
 import javafx.scene.layout.Region;
+import javafx.stage.DirectoryChooser;
 import javafx.stage.FileChooser;
 import javafx.util.Duration;
 import org.controlsfx.control.Notifications;
@@ -89,10 +90,10 @@ public class StellarUI {
      * @return The folder path
      */
     public static Optional<Path> getOutputFolder() {
-        FileChooser chooser = new FileChooser();
+        DirectoryChooser chooser = new DirectoryChooser();
         chooser.setTitle("Stellar OPUS Converter: Choose Output Directory for Converted Files");
         Platform.runLater(() -> {
-            File file = chooser.showOpenDialog(null);
+            File file = chooser.showDialog(null);
             try {
                 OUTPUT_FOLDER_QUEUE.put(file);
             } catch (InterruptedException ex) {

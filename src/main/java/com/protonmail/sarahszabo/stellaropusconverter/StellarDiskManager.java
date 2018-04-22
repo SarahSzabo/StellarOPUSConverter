@@ -94,7 +94,7 @@ public enum StellarDiskManager {
             PreviousState state = initialSetUp();
             outputFolder = state.getOutputFolder();
             //Create Temp Directory & Set Deletion Hook
-            tempDirectory = Files.createTempDirectory("OPUS Converter Temporary Directory");
+            tempDirectory = Files.createTempDirectory("Stellar OPUS Converter Temporary Directory");
             Runtime.getRuntime().addShutdownHook(new Thread(() -> {
                 FileUtils.deleteQuietly(tempDirectory.toFile());
             }, "Stellar OPUS Converter Cleanup Thread"));

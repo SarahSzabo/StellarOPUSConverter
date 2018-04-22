@@ -183,7 +183,7 @@ public class StellarOPUSConverter {
             try {
                 processImage();
                 processOP("ffmpeg", "-ss", start.getTimestamp(), "-i", this.filePath.getFileName().toString(),
-                        "-t", end.getTimestamp(), "-i", this.fileNameNoEXT + ".png", "-y", "-b:a", "320k", "-metadata", "title=" + title,
+                        "-t", end.getTimestamp(), "-y", "-b:a", "320k", "-metadata", "title=" + title,
                         "-metadata", "artist=" + artist, "-strict", "-2", properFileName(title) + ".opus");
             } catch (InterruptedException | IOException ex) {
                 Logger.getLogger(StellarOPUSConverter.class.getName()).log(Level.SEVERE, null, ex);
