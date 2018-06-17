@@ -1,0 +1,14 @@
+
+
+OPTIONS:
+/home/MyHardDriveFile.mp4 = Convert Selected File to .opus
+
+/home/MyHardDriveFile.mp4 "Author" "Title" Converts the file with the specified author and title
+
+/home/MyHardDriveFile.mp4 = 2:5:47 5:0:0 Converts file from 2 hours 5 minutes and 47 seconds to 5 hours to .opus
+NOTE: this also works with just the minutes/seconds format as well. Supports more than 1 pair of timestamps per file
+Ex: /home/MyHardDriveFile.mp4 = 2:5:47 5:0:0 0:20 0:40
+
+Special File Options (Note: Use These Just By Themselves, Ex: -CL):
+-G = Graphical File Chooser
+-CL = Copy the Selected Files From The Clipboard
