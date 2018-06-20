@@ -25,6 +25,16 @@ import java.util.stream.Collectors;
 public class StellarOPUSConverter {
 
     /**
+     * Strips the file extension off of the fileName and returns it.
+     *
+     * @param path The path to have stripped
+     * @return The stripped file name
+     */
+    public static String stripFileExtension(Path path) {
+        return path.getFileName().toString().replaceFirst("[.][^.]+$", "");
+    }
+
+    /**
      * Gets the default metadata list.
      *
      * @return The default list
@@ -49,11 +59,12 @@ public class StellarOPUSConverter {
      * @throws java.io.IOException If something happened
      */
     public StellarOPUSConverter(Path filePath) throws IOException {
+        requireNonNullIterated(filePath);
         this.filePath = filePath;
         this.diskManager = StellarDiskManager.DISKMANAGER;
         //Gets only the file name without extension
         System.out.println(filePath.toAbsolutePath());
-        this.fileNameNoEXT = filePath.getFileName().toString().replaceFirst("[.][^.]+$", "");
+        this.fileNameNoEXT = stripFileExtension(filePath);
         this.trueFileName = this.fileNameNoEXT + ".opus";
         this.metadata = new ArrayList<>(2);
     }
@@ -70,7 +81,10 @@ public class StellarOPUSConverter {
         StringBuilder builder = new StringBuilder(field.length());
         String[] spacedTitleCharacters = field.split(" ");
         for (String str : spacedTitleCharacters) {
-            builder.append(String.valueOf(str.charAt(0)).toUpperCase()).append(str.substring(1)).append(" ");
+            builder.append(String.valueOf(str.charAt(0)).toUpperCase()).append(str.substring(1));
+            if (!str.equalsIgnoreCase(spacedTitleCharacters[spacedTitleCharacters.length - 1])) {
+                builder.append(" ");
+            }
         }
         return builder.toString();
     }
@@ -144,8 +158,8 @@ public class StellarOPUSConverter {
      */
     public Path convertToOPUS(StellarFFMPEGTimeStamp start, StellarFFMPEGTimeStamp end) throws IOException {
         //Convert to Proper Format
-        this.metadata.addAll(StellarUI.askUserForArtistTitle().stream().map(string -> properMetadataFormat(string))
-                .collect(Collectors.toList()));
+        this.metadata.addAll(StellarUI.askUserForArtistTitle("Start: " + start + "\nEnd: " + end)
+                .stream().map(string -> properMetadataFormat(string)).collect(Collectors.toList()));
         return convertToOPUS(this.metadata.get(0), this.metadata.get(1), start, end);
     }
 
@@ -280,7 +294,18 @@ public class StellarOPUSConverter {
     private void copyOP(CopyOperation operation) throws IOException {
         this.diskManager.copyToTemp(this.filePath);
         operation.doOperation();
-        this.diskManager.copyFromTemp(this.metadata.get(1) + ".opus");
+        this.diskManager.copyFromTemp(properMetadataFormat(this.metadata.get(1)) + ".opus");
+    }
+
+    /**
+     * Gets the filename format for the image conversion process. The metadata
+     * must be set before calling this method.
+     *
+     * @return The filename
+     */
+    private String getFileName() {
+        return properMetadataFormat(this.metadata.get(0)) + " -- "
+                + properMetadataFormat(this.metadata.get(1)) + ".png";
     }
 
     /**
@@ -292,15 +317,15 @@ public class StellarOPUSConverter {
     private void processImage() throws IOException, InterruptedException {
         synchronized (StellarOPUSConverter.class) {
             //Check if Image Already Exists
-            if (Files.exists(Paths.get(this.diskManager.getOutputFolder().toString(), fileNameNoEXT + ".png"))) {
+            if (Files.exists(Paths.get(this.diskManager.getOutputFolder().toString(), getFileName()))) {
                 return;
             }
             //ffmpeg -ss 25 -i input.mp4 -qscale:v 2 -frames:v 1 -huffman optimal output.jpg
             processOP("ffmpeg", "-ss", "30", "-i", filePath.getFileName().toString(), "-y", "-qscale:v", "2",
-                    "-frames:v", "1", "-huffman", "optimal", fileNameNoEXT + ".png");
+                    "-frames:v", "1", "-huffman", "optimal", getFileName());
             //Remove This Once This Becomes Automated
-            Files.copy(Paths.get(this.diskManager.getTempDirectory().toString(), fileNameNoEXT + ".png"),
-                    Paths.get(this.diskManager.getOutputFolder().toString(), fileNameNoEXT + ".png"));
+            Files.copy(Paths.get(this.diskManager.getTempDirectory().toString(), getFileName()),
+                    Paths.get(this.diskManager.getOutputFolder().toString(), getFileName()));
         }
     }
 

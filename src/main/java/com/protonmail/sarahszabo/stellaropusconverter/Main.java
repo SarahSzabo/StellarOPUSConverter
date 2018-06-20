@@ -34,9 +34,8 @@ public class Main {
         else if (args.length == 1 && args[0].equalsIgnoreCase("-CL")) {
             StellarMode.GET_FROM_CLIPBOARD.start(args);
         } //Error for 2 Args
-        else if (args.length == 2) {
-            messageThenExit("We don't currently support 2 arguments");
-            printHelp();
+        else if (args.length == 2 && args[0].equalsIgnoreCase("-CL")) {
+            stellarConversion(StellarMode.CLIPBOARD_SAME_ARTIST, args);
         }//Manually Specify Author/Title
         else if (args.length == 3 && firstArgIsLink(args[0]) && !allStringsAreTimestamps(args)) {
             stellarConversion(StellarMode.LINK_AUTHOR_TITLE, args);

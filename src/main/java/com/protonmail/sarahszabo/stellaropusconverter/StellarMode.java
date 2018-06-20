@@ -100,8 +100,7 @@ public enum StellarMode {
     GET_FROM_CLIPBOARD {
         @Override
         public void start(String... args) {
-            doMultipleConversion(Optional.of(StellarUI.getFilesFromClipboard().stream()
-                    .map(file -> file.toPath()).collect(Collectors.toList())));
+            doMultipleConversion(Optional.of(StellarUI.getFilesFromClipboard()));
         }
 
     },
@@ -112,6 +111,30 @@ public enum StellarMode {
         @Override
         public void start(String... args) {
             doMultipleConversion(StellarUI.getFiles());
+        }
+
+    },
+    /**
+     * A shortcut for when all files on the clipboard are made by the same
+     * artist. Uses the provided artist with the filenames.
+     */
+    CLIPBOARD_SAME_ARTIST {
+        @Override
+        public void start(String... args) throws IOException {
+            StellarHyperspace.runGeneralConversionTasks(StellarUI.getFilesFromClipboard().stream()
+                    .map(path -> toTaskFormat(path, args[1])).collect(Collectors.toList()));
+        }
+
+        /**
+         * Helper subroutine for task creation.
+         *
+         * @return The task to run in hyperspace
+         */
+        private Callable<Path> toTaskFormat(Path filePath, String artist) {
+            return () -> {
+                StellarOPUSConverter converter = new StellarOPUSConverter(filePath);
+                return converter.convertToOPUS(artist, StellarOPUSConverter.stripFileExtension(filePath));
+            };
         }
     };
 

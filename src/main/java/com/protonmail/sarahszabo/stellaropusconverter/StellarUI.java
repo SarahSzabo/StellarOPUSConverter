@@ -56,7 +56,7 @@ public class StellarUI {
      *
      * @return The files or null if none
      */
-    public static List<File> getFilesFromClipboard() {
+    public static List<Path> getFilesFromClipboard() {
         try {
             BlockingQueue<List<File>> queue = new ArrayBlockingQueue<>(1);
             Platform.runLater(() -> {
@@ -66,7 +66,7 @@ public class StellarUI {
                     Logger.getLogger(StellarUI.class.getName()).log(Level.SEVERE, null, ex);
                 }
             });
-            return queue.take();
+            return queue.take().stream().map(file -> file.toPath()).collect(Collectors.toList());
         } catch (InterruptedException ex) {
             Logger.getLogger(StellarUI.class.getName()).log(Level.SEVERE, null, ex);
         }
