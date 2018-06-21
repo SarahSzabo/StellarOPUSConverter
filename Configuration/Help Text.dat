@@ -17,3 +17,4 @@ Special File Options (Note: Use These Just By Themselves, Ex: -CL):
 Settings:
 Set PicturesFolder = Change the Picture Output Folder
 Set OutputFolder = Change the Output Folder for Files
+Status = Print Current Status (Folder Locations)

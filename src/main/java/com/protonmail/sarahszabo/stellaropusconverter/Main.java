@@ -35,6 +35,8 @@ public class Main {
             } //Get From Clipboard
             else if (args[0].equalsIgnoreCase("-CL")) {
                 StellarMode.GET_FROM_CLIPBOARD.start(args);
+            } else if (args[0].equalsIgnoreCase("Status")) {
+                System.out.println(StellarDiskManager.DISKMANAGER.getState());
             } else {
                 printHelp();
             }

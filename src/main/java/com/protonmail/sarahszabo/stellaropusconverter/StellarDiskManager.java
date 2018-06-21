@@ -38,7 +38,7 @@ public enum StellarDiskManager {
     /**
      * The previous state file
      */
-    public static final Path PREVIOUS_CONFIGURATION = Paths.get(CONFIGURATION_FOLDER.toString(), "Previous Configuration.json");
+    public static final Path PREVIOUS_CONFIGURATION = Paths.get(CONFIGURATION_FOLDER.toString(), "Previous State.json");
 
     /**
      * The location of the help text file.
@@ -76,7 +76,7 @@ public enum StellarDiskManager {
      * @return The default configuration
      * @throws IOException If something happened
      */
-    private static PreviousState initialSetUp() throws IOException {
+    private static DiskManagerState initialSetUp() throws IOException {
         try {
             //If File Doesn't Exist Create it & Set Default State
             if (Files.notExists(CONFIGURATION_FOLDER)) {
@@ -84,7 +84,7 @@ public enum StellarDiskManager {
             }
             if (Files.notExists(PREVIOUS_CONFIGURATION)) {
                 //Set Previous State, by default is the program folder
-                PreviousState state = new PreviousState(StellarUI.getOutputFolderFor("Converted Files")
+                DiskManagerState state = new DiskManagerState(StellarUI.getOutputFolderFor("Converted Files")
                         .orElse(USER_DIR),
                         StellarUI.getOutputFolderFor("Picture Folder").orElse(USER_DIR));
                 mapper.writeValue(PREVIOUS_CONFIGURATION.toFile(), state);
@@ -92,7 +92,7 @@ public enum StellarDiskManager {
                         + "\nThe picture output directory is set to: " + state.getPictureOutputFolder());
                 return state;
             } else {
-                return mapper.readValue(PREVIOUS_CONFIGURATION.toFile(), PreviousState.class);
+                return mapper.readValue(PREVIOUS_CONFIGURATION.toFile(), DiskManagerState.class);
             }
         } catch (InvalidDefinitionException | UnrecognizedPropertyException exc) {
             //JSON Exception Happened, Delete Settings & Reset Configuration Folder & Try Again
@@ -126,7 +126,7 @@ public enum StellarDiskManager {
 
     static {
         try {
-            PreviousState state = initialSetUp();
+            DiskManagerState state = initialSetUp();
             outputFolder = state.getOutputFolder();
             pictureOutputFolder = state.getPictureOutputFolder();
             if (pictureOutputFolder == null) {
@@ -140,7 +140,7 @@ public enum StellarDiskManager {
                     //Delete Temp Folder =D
                     FileUtils.deleteQuietly(tempDirectory.toFile());
                     //Save Settings
-                    mapper.writeValue(PREVIOUS_CONFIGURATION.toFile(), new PreviousState(outputFolder, pictureOutputFolder));
+                    mapper.writeValue(PREVIOUS_CONFIGURATION.toFile(), new DiskManagerState(outputFolder, pictureOutputFolder));
                 } catch (IOException ex) {
                     Logger.getLogger(StellarDiskManager.class.getName()).log(Level.SEVERE, null, ex);
                     System.err.println("Oh Noes! The cleanup thread had an exception!\n\n");
@@ -205,10 +205,19 @@ public enum StellarDiskManager {
     }
 
     /**
+     * Gets the current state.
+     *
+     * @return The current state of the disk manager
+     */
+    public DiskManagerState getState() {
+        return new DiskManagerState(outputFolder, pictureOutputFolder);
+    }
+
+    /**
      * An abstraction representing the previous state of the program.
      */
     @JsonIgnoreProperties(ignoreUnknown = true)
-    static final class PreviousState {
+    static final class DiskManagerState {
 
         @JsonProperty("outputFolder")
         private final Path outputFolder;
@@ -217,21 +226,21 @@ public enum StellarDiskManager {
         private final Path pictureOutputFolder;
 
         /**
-         * Creates a new previous state with the specified output folder.
+         * Creates a new disk manager state with the specified output folder.
          *
          * @param outputFolder
          */
-        PreviousState(Path outputFolder) {
+        DiskManagerState(Path outputFolder) {
             this(outputFolder, Paths.get(""));
         }
 
         /**
-         * Creates a new previous state with the specified output folder.
+         * Creates a new disk manager with the specified output folder.
          *
          * @param outputFolder
          */
         @JsonCreator
-        PreviousState(@JsonProperty("outputFolder") Path outputFolder,
+        DiskManagerState(@JsonProperty("outputFolder") Path outputFolder,
                 @JsonProperty("pictureOutputFolder") Path pictureOutputFolder) {
             this.outputFolder = outputFolder;
             this.pictureOutputFolder = pictureOutputFolder;
@@ -254,5 +263,11 @@ public enum StellarDiskManager {
         public Path getPictureOutputFolder() {
             return this.pictureOutputFolder;
         }
+
+        @Override
+        public String toString() {
+            return "Output Folder: " + this.outputFolder + "\nPictures Folder: " + this.pictureOutputFolder;
+        }
+
     }
 }
