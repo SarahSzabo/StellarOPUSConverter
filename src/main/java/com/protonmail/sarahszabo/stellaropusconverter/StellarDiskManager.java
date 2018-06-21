@@ -5,13 +5,19 @@
  */
 package com.protonmail.sarahszabo.stellaropusconverter;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import java.io.BufferedReader;
+import com.fasterxml.jackson.databind.exc.InvalidDefinitionException;
+import com.fasterxml.jackson.databind.exc.UnrecognizedPropertyException;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import org.apache.commons.io.FileUtils;
 
 /**
@@ -45,6 +51,11 @@ public enum StellarDiskManager {
     public static final Path USER_DIR = Paths.get(System.getProperty("user.dir"));
 
     /**
+     * The default object mapper for this application.
+     */
+    public static final ObjectMapper mapper = new ObjectMapper();
+
+    /**
      * Gets the help text from the help text file.
      *
      * @return The string containing all the text
@@ -66,29 +77,37 @@ public enum StellarDiskManager {
      * @throws IOException If something happened
      */
     private static PreviousState initialSetUp() throws IOException {
-        ObjectMapper mapper = new ObjectMapper();
-        //If File Doesn't Exist Create it & Set Default State
-        if (Files.notExists(CONFIGURATION_FOLDER)) {
-            Files.createDirectories(CONFIGURATION_FOLDER);
-            Files.createFile(PREVIOUS_CONFIGURATION);
-            //Set Previous State, by default is the program folder
-            PreviousState state = new PreviousState(StellarUI.getOutputFolder().orElse(USER_DIR));
-            mapper.writeValue(PREVIOUS_CONFIGURATION.toFile(), state);
-            System.out.println("The output directory is now set to: " + state.getOutputFolder());
+        try {
+            //If File Doesn't Exist Create it & Set Default State
+            if (Files.notExists(CONFIGURATION_FOLDER)) {
+                Files.createDirectories(CONFIGURATION_FOLDER);
+            }
+            if (Files.notExists(PREVIOUS_CONFIGURATION)) {
+                //Set Previous State, by default is the program folder
+                PreviousState state = new PreviousState(StellarUI.getOutputFolderFor("Converted Files")
+                        .orElse(USER_DIR),
+                        StellarUI.getOutputFolderFor("Picture Folder").orElse(USER_DIR));
+                mapper.writeValue(PREVIOUS_CONFIGURATION.toFile(), state);
+                System.out.println("The output directory is now set to: " + state.getOutputFolder()
+                        + "\nThe picture output directory is set to: " + state.getPictureOutputFolder());
+                return state;
+            } else {
+                return mapper.readValue(PREVIOUS_CONFIGURATION.toFile(), PreviousState.class);
+            }
+        } catch (InvalidDefinitionException | UnrecognizedPropertyException exc) {
+            //JSON Exception Happened, Delete Settings & Reset Configuration Folder & Try Again
+            FileUtils.deleteQuietly(PREVIOUS_CONFIGURATION.toFile());
+            return initialSetUp();
         }
-        return mapper.readValue(PREVIOUS_CONFIGURATION.toFile(), PreviousState.class);
     }
 
     /**
-     * Changes the output folder location. Does not write the new location to
-     * the disk for use next time.
+     * Changes the picture output folder to the one specified.
      *
-     * @param newOutputFolder The path of the output folder
-     * @return The new disk manager for this folder
+     * @param newPath The New Folder Path
      */
-    public static synchronized StellarDiskManager changeOutputFolderNonPermanant(Path newOutputFolder) throws IOException {
-        outputFolder = newOutputFolder;
-        return DISKMANAGER;
+    public static synchronized void changePictureOutputFolder(Path newPath) {
+        pictureOutputFolder = newPath;
     }
 
     /**
@@ -96,31 +115,41 @@ public enum StellarDiskManager {
      * disk.
      *
      * @param newOutputFolder The path of the output folder
-     * @return The new disk manager for this folder
      * @throws java.io.IOException If something happened
      */
-    public static synchronized StellarDiskManager changeOutputFolder(Path newOutputFolder) throws IOException {
+    public static synchronized void changeOutputFolder(Path newOutputFolder) throws IOException {
         outputFolder = newOutputFolder;
-        ObjectMapper mapper = new ObjectMapper();
-        mapper.writeValue(PREVIOUS_CONFIGURATION.toFile(), new PreviousState(newOutputFolder));
-        return DISKMANAGER;
     }
 
-    private static Path outputFolder = USER_DIR;
+    private static Path outputFolder = USER_DIR, pictureOutputFolder = USER_DIR;
     private static final Path tempDirectory;
 
     static {
         try {
             PreviousState state = initialSetUp();
             outputFolder = state.getOutputFolder();
+            pictureOutputFolder = state.getPictureOutputFolder();
+            if (pictureOutputFolder == null) {
+                pictureOutputFolder = StellarUI.getOutputFolderFor("Picture Output Folder").orElse(USER_DIR);
+                System.out.println("Picture Output Folder Changed to: " + pictureOutputFolder);
+            }
             //Create Temp Directory & Set Deletion Hook
             tempDirectory = Files.createTempDirectory("Stellar OPUS Converter Temporary Directory");
             Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-                FileUtils.deleteQuietly(tempDirectory.toFile());
+                try {
+                    //Delete Temp Folder =D
+                    FileUtils.deleteQuietly(tempDirectory.toFile());
+                    //Save Settings
+                    mapper.writeValue(PREVIOUS_CONFIGURATION.toFile(), new PreviousState(outputFolder, pictureOutputFolder));
+                } catch (IOException ex) {
+                    Logger.getLogger(StellarDiskManager.class.getName()).log(Level.SEVERE, null, ex);
+                    System.err.println("Oh Noes! The cleanup thread had an exception!\n\n");
+                    throw new RuntimeException(ex);
+                }
             }, "Stellar OPUS Converter Cleanup Thread"));
         } catch (IOException ex) {
             throw new IllegalStateException("We encountered an IO error, the disk might be full."
-                    + " We couldn't create our temporary directory");
+                    + " We couldn't create our temporary directory", ex);
         }
     }
 
@@ -136,10 +165,25 @@ public enum StellarDiskManager {
                 StandardCopyOption.REPLACE_EXISTING);
     }
 
+    /**
+     * Copies the selected file from the temp directory to the output folder.
+     *
+     * @param fileName The filename to move
+     * @throws IOException If something went wrong
+     */
     public void copyFromTemp(String fileName) throws IOException {
         System.out.println("\n\nFile Copy Exists in Temp Folder: " + Files.exists(Paths.get(tempDirectory.toString(), fileName)));
         Files.copy(Paths.get(tempDirectory.toString(), fileName),
                 Paths.get(this.outputFolder.toString(), fileName), StandardCopyOption.REPLACE_EXISTING);
+    }
+
+    /**
+     * Gets the picture output folder path.
+     *
+     * @return The path
+     */
+    public Path getPictureOutputFolder() {
+        return pictureOutputFolder;
     }
 
     /**
@@ -163,16 +207,14 @@ public enum StellarDiskManager {
     /**
      * An abstraction representing the previous state of the program.
      */
+    @JsonIgnoreProperties(ignoreUnknown = true)
     static final class PreviousState {
 
-        private Path outputFolder;
+        @JsonProperty("outputFolder")
+        private final Path outputFolder;
 
-        /**
-         * Default constructor for Jackson (JSON).
-         */
-        public PreviousState() {
-            this.outputFolder = Paths.get("");
-        }
+        @JsonProperty("pictureOutputFolder")
+        private final Path pictureOutputFolder;
 
         /**
          * Creates a new previous state with the specified output folder.
@@ -180,7 +222,19 @@ public enum StellarDiskManager {
          * @param outputFolder
          */
         PreviousState(Path outputFolder) {
+            this(outputFolder, Paths.get(""));
+        }
+
+        /**
+         * Creates a new previous state with the specified output folder.
+         *
+         * @param outputFolder
+         */
+        @JsonCreator
+        PreviousState(@JsonProperty("outputFolder") Path outputFolder,
+                @JsonProperty("pictureOutputFolder") Path pictureOutputFolder) {
             this.outputFolder = outputFolder;
+            this.pictureOutputFolder = pictureOutputFolder;
         }
 
         /**
@@ -193,12 +247,12 @@ public enum StellarDiskManager {
         }
 
         /**
-         * Sets the default folder path.
+         * Gets the picture output folder.
          *
-         * @param outputFolder The folder path
+         * @return The picture output folder
          */
-        public void setOutputFolder(Path outputFolder) {
-            this.outputFolder = outputFolder;
+        public Path getPictureOutputFolder() {
+            return this.pictureOutputFolder;
         }
     }
 }

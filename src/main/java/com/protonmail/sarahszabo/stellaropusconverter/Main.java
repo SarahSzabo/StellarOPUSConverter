@@ -7,6 +7,7 @@ package com.protonmail.sarahszabo.stellaropusconverter;
 
 import java.io.IOException;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Arrays;
 
@@ -25,21 +26,46 @@ public class Main {
             System.out.println("There is no file specified!\n");
             printHelp();
         } //Direct Link Conversion
-        else if (args.length == 1 && firstArgIsLink(args[0])) {
-            StellarMode.DIRECT_LINK.start(args);
-        } //Init Graphical File Chooser
-        else if (args.length == 1 && args[0].equalsIgnoreCase("-G")) {
-            StellarMode.GRAPHICAL_FILE_CHOICE_DIRECT_LINKS.start(args);
-        } //Get From Clipboard
-        else if (args.length == 1 && args[0].equalsIgnoreCase("-CL")) {
-            StellarMode.GET_FROM_CLIPBOARD.start(args);
-        } //Error for 2 Args
-        else if (args.length == 2 && args[0].equalsIgnoreCase("-CL")) {
-            stellarConversion(StellarMode.CLIPBOARD_SAME_ARTIST, args);
-        }//Manually Specify Author/Title
-        else if (args.length == 3 && firstArgIsLink(args[0]) && !allStringsAreTimestamps(args)) {
-            stellarConversion(StellarMode.LINK_AUTHOR_TITLE, args);
-        } //Odd Number of Entries >= 3 (URL, timestamp0 timestamp1 timestamp2 timestamp3
+        else if (args.length == 1) {
+            if (firstArgIsLink(args[0])) {
+                StellarMode.DIRECT_LINK.start(args);
+            } //Init Graphical File Chooser
+            else if (args[0].equalsIgnoreCase("-G")) {
+                StellarMode.GRAPHICAL_FILE_CHOICE_DIRECT_LINKS.start(args);
+            } //Get From Clipboard
+            else if (args[0].equalsIgnoreCase("-CL")) {
+                StellarMode.GET_FROM_CLIPBOARD.start(args);
+            } else {
+                printHelp();
+            }
+        } else if (args.length == 2) {
+            //-CL With All Same Artist
+            if (args[0].equalsIgnoreCase("-CL")) {
+                stellarConversion(StellarMode.CLIPBOARD_SAME_ARTIST, args);
+            } //Change Settings
+            else if (args[0].equalsIgnoreCase("Set")) {
+                if (args[1].equalsIgnoreCase("PicturesFolder")) {
+                    Path path = StellarUI.getOutputFolderFor("Picture Folder")
+                            .orElse(StellarDiskManager.USER_DIR);
+                    StellarDiskManager.changePictureOutputFolder(path);
+                    messageThenExit("Folder Changed To:" + path);
+                } else if (args[1].equalsIgnoreCase("OutputFolder")) {
+                    Path path = StellarUI.getOutputFolderFor("Output Folder")
+                            .orElse(StellarDiskManager.USER_DIR);
+                    StellarDiskManager.changeOutputFolder(path);
+                    messageThenExit("Folder Changed To: " + path);
+                }
+            } else {
+                printHelp();
+            }
+        } else if (args.length == 3) {
+            //Manually Specify Author/Title with Timestamps
+            if (firstArgIsLink(args[0]) && !allStringsAreTimestamps(args)) {
+                stellarConversion(StellarMode.LINK_AUTHOR_TITLE, args);
+            } else {
+                printHelp();
+            }
+        }//Odd Number of Entries >= 3 (URL, timestamp0 timestamp1 timestamp2 timestamp3
         else if (args.length >= 3 && firstArgIsLink(args[0]) && (args.length + 1) % 2 == 0
                 && allStringsAreTimestamps(args)) {
             StellarMode.LINK_TIMESTAMPS.start(args);

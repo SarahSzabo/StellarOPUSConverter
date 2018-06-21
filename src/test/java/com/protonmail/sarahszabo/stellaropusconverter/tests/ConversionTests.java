@@ -46,12 +46,4 @@ public class ConversionTests {
             Files.createDirectory(TEST_FOLDER);
         }
     }
-
-    @Test
-    public void testDirectLink() throws IOException {
-        StellarDiskManager.changeOutputFolderNonPermanant(TEST_FOLDER);
-        StellarMode.DIRECT_LINK.start(TEST_FILE.toAbsolutePath().toString());
-        assertNotEquals(TEST_FOLDER.toFile().listFiles().length, 0);
-        resetTestFolder();
-    }
 }

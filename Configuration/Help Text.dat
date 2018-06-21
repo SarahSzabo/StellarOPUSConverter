@@ -13,3 +13,7 @@ Special File Options (Note: Use These Just By Themselves, Ex: -CL):
 -G = Graphical File Chooser
 -CL = Copy the Selected Files From The Clipboard
 -CL "Artist" = All Files in Clipboard Share this Artist, No Prompts Required
+
+Settings:
+Set PicturesFolder = Change the Picture Output Folder
+Set OutputFolder = Change the Output Folder for Files

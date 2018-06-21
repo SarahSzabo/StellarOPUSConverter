@@ -121,8 +121,8 @@ public enum StellarMode {
     CLIPBOARD_SAME_ARTIST {
         @Override
         public void start(String... args) throws IOException {
-            StellarHyperspace.runGeneralConversionTasks(StellarUI.getFilesFromClipboard().stream()
-                    .map(path -> toTaskFormat(path, args[1])).collect(Collectors.toList()));
+            printFileList(StellarHyperspace.runGeneralConversionTasks(StellarUI.getFilesFromClipboard().stream()
+                    .map(path -> toTaskFormat(path, args[1])).collect(Collectors.toList())));
         }
 
         /**
@@ -139,6 +139,24 @@ public enum StellarMode {
     };
 
     public abstract void start(String... args) throws IOException;
+
+    /**
+     * Prints the list from Hyperspace
+     *
+     * @param paths The future paths
+     */
+    public void printFileList(List<Future<Path>> paths) {
+        String string = paths.stream().map(futurePath -> {
+            try {
+                return futurePath.get().toString();
+            } catch (Exception ex) {
+                Logger.getLogger(StellarMode.class.getName()).log(Level.SEVERE, null, ex);
+                throw new RuntimeException(ex);
+            }
+        })
+                .collect(Collectors.joining("\n"));
+        System.out.println("\n\nCompleted Files:\n\n" + string);
+    }
 
     /**
      * Does multiple conversions by sending them all to Hyperspace.

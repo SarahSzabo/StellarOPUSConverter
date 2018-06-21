@@ -132,11 +132,13 @@ public class StellarUI {
     /**
      * Gets the output folder location.
      *
+     * @param type The String type of object to set as the label Ex: Converted
+     * Files
      * @return The folder path
      */
-    public static Optional<Path> getOutputFolder() {
+    public static Optional<Path> getOutputFolderFor(String type) {
         DirectoryChooser chooser = new DirectoryChooser();
-        chooser.setTitle("Stellar OPUS Converter: Choose Output Directory for Converted Files");
+        chooser.setTitle("Stellar OPUS Converter: Choose Directory for " + type);
         Platform.runLater(() -> {
             File file = chooser.showDialog(null);
             try {
