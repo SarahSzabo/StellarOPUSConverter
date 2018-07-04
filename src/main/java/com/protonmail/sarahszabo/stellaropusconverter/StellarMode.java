@@ -30,6 +30,22 @@ import javafx.scene.input.Clipboard;
  * @author Sarah Szabo <PhysicistSarah@Gmail.com>
  */
 public enum StellarMode {
+
+    /**
+     * Used when we are interested in converting to the 120k format for our
+     * mobile phones.
+     */
+    SPACE_BRIDGE {
+        @Override
+        public void start(String... args) throws IOException {
+            SpaceBridge.SPACE_BRIDGE.initBridge();
+            try {
+                StellarHyperspace.initiateFalseVacuum();
+            } catch (InterruptedException ex) {
+                Logger.getLogger(StellarMode.class.getName()).log(Level.SEVERE, null, ex);
+            }
+        }
+    },
     /**
      * Used when only a direct link to the file is chosen, and nothing else.
      */
@@ -177,7 +193,11 @@ public enum StellarMode {
             System.out.println("\n\n\nCompleted Output Files:");
             finalPaths.stream().forEach(System.out::println);
         }
-        StellarHyperspace.initiateFalseVacuum();
+        try {
+            StellarHyperspace.initiateFalseVacuum();
+        } catch (InterruptedException ex) {
+            Logger.getLogger(StellarMode.class.getName()).log(Level.SEVERE, null, ex);
+        }
         Platform.exit();
     }
 

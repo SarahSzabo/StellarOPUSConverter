@@ -37,6 +37,8 @@ public class Main {
                 StellarMode.GET_FROM_CLIPBOARD.start(args);
             } else if (args[0].equalsIgnoreCase("Status")) {
                 System.out.println(StellarDiskManager.DISKMANAGER.getState());
+            } else if (args[0].equalsIgnoreCase("Space-Bridge")) {
+                stellarConversion(StellarMode.SPACE_BRIDGE, args);
             } else {
                 printHelp();
             }
@@ -46,16 +48,21 @@ public class Main {
                 stellarConversion(StellarMode.CLIPBOARD_SAME_ARTIST, args);
             } //Change Settings
             else if (args[0].equalsIgnoreCase("Set")) {
-                if (args[1].equalsIgnoreCase("PicturesFolder")) {
-                    Path path = StellarUI.getOutputFolderFor("Picture Folder")
+                if (args[1].equalsIgnoreCase("Pictures-Folder")) {
+                    Path path = StellarUI.getFolderFor("Picture Folder")
                             .orElse(StellarDiskManager.USER_DIR);
-                    StellarDiskManager.changePictureOutputFolder(path);
-                    messageThenExit("Folder Changed To:" + path);
-                } else if (args[1].equalsIgnoreCase("OutputFolder")) {
-                    Path path = StellarUI.getOutputFolderFor("Output Folder")
+                    StellarDiskManager.setPictureOutputFolder(path);
+                    messageThenExit("Output Folder Changed To:" + path);
+                } else if (args[1].equalsIgnoreCase("Output-Folder")) {
+                    Path path = StellarUI.getFolderFor("Output Folder")
                             .orElse(StellarDiskManager.USER_DIR);
-                    StellarDiskManager.changeOutputFolder(path);
-                    messageThenExit("Folder Changed To: " + path);
+                    StellarDiskManager.setOutputFolder(path);
+                    messageThenExit("Picture Folder Changed To: " + path);
+                } else if (args[1].equalsIgnoreCase("Space-Bridge-Folder")) {
+                    Path path = StellarUI.getFolderFor("Space-Bridge Folder")
+                            .orElse(StellarDiskManager.USER_DIR);
+                    StellarDiskManager.setSpaceBridgeDirectory(path);
+                    messageThenExit("Space-Bridge Folder Changed To: " + path);
                 }
             } else {
                 printHelp();

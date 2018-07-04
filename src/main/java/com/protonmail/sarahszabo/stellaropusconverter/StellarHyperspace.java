@@ -13,6 +13,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
@@ -37,12 +38,38 @@ public class StellarHyperspace {
             return new Thread(r, "Stellar Hyperspace Thread " + threadCount++);
         }
     });
+    private static final ExecutorService spaceBridge = Executors.newSingleThreadExecutor((Runnable r) -> {
+        return new Thread(r, "Stellar Space-Bridge Logging Thread");
+    });
+
+    /**
+     * Gets the space bridge executor.
+     *
+     * @return The space bridge executor
+     */
+    public static ExecutorService getSpaceBridge() {
+        return spaceBridge;
+    }
+
+    /**
+     * Gets the hyperspace executor.
+     *
+     * @return Hyperspace
+     */
+    public static ExecutorService getHyperspace() {
+        return hyperspace;
+    }
 
     /**
      * Causes a false vacuum, clearing the hyperspace of any new requests.
+     *
+     * @throws java.lang.InterruptedException if the thread was interrupted
      */
-    public static void initiateFalseVacuum() {
+    public static void initiateFalseVacuum() throws InterruptedException {
         hyperspace.shutdown();
+        hyperspace.awaitTermination(Long.MAX_VALUE, TimeUnit.DAYS);
+        spaceBridge.shutdown();
+        spaceBridge.awaitTermination(Long.MAX_VALUE, TimeUnit.DAYS);
     }
 
     /**

@@ -136,7 +136,7 @@ public class StellarUI {
      * Files
      * @return The folder path
      */
-    public static Optional<Path> getOutputFolderFor(String type) {
+    public static Optional<Path> getFolderFor(String type) {
         DirectoryChooser chooser = new DirectoryChooser();
         chooser.setTitle("Stellar OPUS Converter: Choose Directory for " + type);
         Platform.runLater(() -> {

@@ -1,6 +1,6 @@
 
 
-OPTIONS:
+Conversion Options:
 /home/MyHardDriveFile.mp4 = Convert Selected File to .opus
 
 /home/MyHardDriveFile.mp4 "Author" "Title" Converts the file with the specified author and title
@@ -14,7 +14,15 @@ Special File Options (Note: Use These Just By Themselves, Ex: -CL):
 -CL = Copy the Selected Files From The Clipboard
 -CL "Artist" = All Files in Clipboard Share this Artist, No Prompts Required
 
+Alternate Modes:
+Space-Bridge = Enables the Space-Bridge Mobile Conversion Functionality. This watches a certain directory and all sub-directories
+ and converts them to 120K for mobile devices.
+
 Settings:
-Set PicturesFolder = Change the Picture Output Folder
-Set OutputFolder = Change the Output Folder for Files
+Set Pictures-Folder = Change the Picture Output Folder
+Set Output-Folder = Change the Output Folder for Files
+Set Space-Bridge-Folder = Change the Space=Bridge Watch Folder
 Status = Print Current Status (Folder Locations)
+
+Currently Supported Formats: .MP4, .MP3, .OPUS
+Note: .OPUS -> .OPUS conversions are possible, the metadata will be copied over once you set it, per the usual conversion process.

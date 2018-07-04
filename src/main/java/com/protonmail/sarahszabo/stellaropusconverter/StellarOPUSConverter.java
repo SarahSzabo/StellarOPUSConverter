@@ -9,13 +9,17 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * A converter that converts files to the OPUS format.
@@ -47,9 +51,41 @@ public class StellarOPUSConverter {
     }
 
     private final String fileNameNoEXT, trueFileName;
-    private final Path filePath;
+    private final Path filePath, outputFolder;
     private final List<String> metadata;
     private final StellarDiskManager diskManager;
+    private final FileExtension fileExtension;
+
+    /**
+     * Constructs a new {@link StellarOPUSConverter} with the specified file
+     * path and manually specified output folder.
+     *
+     * @param filePath The file for conversion
+     * @param outputFolder The path to put the finished file in
+     * @throws java.io.IOException If something happened
+     */
+    public StellarOPUSConverter(Path filePath, Path outputFolder) throws IOException {
+        this.filePath = Objects.requireNonNull(filePath);
+        this.outputFolder = Objects.requireNonNull(outputFolder);
+        this.diskManager = StellarDiskManager.DISKMANAGER;
+        //Gets only the file name without extension
+        this.fileNameNoEXT = stripFileExtension(filePath);
+        FileExtension dummyExtension = null;
+        for (FileExtension extension : FileExtension.values()) {
+            Pattern pattern = Pattern.compile(extension.toString(), Pattern.CASE_INSENSITIVE);
+            Matcher matcher = pattern.matcher(filePath.getFileName().toString());
+            if (matcher.find()) {
+                dummyExtension = extension;
+            }
+        }
+        if (dummyExtension == null) {
+            throw new IllegalStateException("The chosen file is not among the list of convertable formats");
+        } else {
+            this.fileExtension = dummyExtension;
+        }
+        this.trueFileName = this.fileNameNoEXT + ".opus";
+        this.metadata = new ArrayList<>(2);
+    }
 
     /**
      * Constructs a new {@link StellarOPUSConverter} with the specified file
@@ -59,14 +95,7 @@ public class StellarOPUSConverter {
      * @throws java.io.IOException If something happened
      */
     public StellarOPUSConverter(Path filePath) throws IOException {
-        requireNonNullIterated(filePath);
-        this.filePath = filePath;
-        this.diskManager = StellarDiskManager.DISKMANAGER;
-        //Gets only the file name without extension
-        System.out.println(filePath.toAbsolutePath());
-        this.fileNameNoEXT = stripFileExtension(filePath);
-        this.trueFileName = this.fileNameNoEXT + ".opus";
-        this.metadata = new ArrayList<>(2);
+        this(filePath, StellarDiskManager.DISKMANAGER.getTempDirectory());
     }
 
     /**
@@ -76,17 +105,10 @@ public class StellarOPUSConverter {
      * @param field The field to capitalise
      * @return The formatted string
      */
-    private String properMetadataFormat(String field) {
-        //Uppercase First Character of Both Titles
-        StringBuilder builder = new StringBuilder(field.length());
-        String[] spacedTitleCharacters = field.split(" ");
-        for (String str : spacedTitleCharacters) {
-            builder.append(String.valueOf(str.charAt(0)).toUpperCase()).append(str.substring(1));
-            if (!str.equalsIgnoreCase(spacedTitleCharacters[spacedTitleCharacters.length - 1])) {
-                builder.append(" ");
-            }
-        }
-        return builder.toString();
+    private static String properMetadataFormat(String field) {
+        //Uppercase First Character of Both Titles & Trim. Handles unusual edge cases such as F I L E.opus
+        return Stream.of(field.trim().split(" ")).map(string -> string.isEmpty() ? " " : (string.charAt(0) + "").toUpperCase()
+                + (string.length() > 1 ? string.substring(1) : "")).collect(Collectors.joining(" "));
     }
 
     /**
@@ -111,6 +133,19 @@ public class StellarOPUSConverter {
      * @throws IOException If something happened
      */
     public Path convertToOPUS(String artist, String title) throws IOException {
+        return convertToOPUS(artist, title, 320);
+    }
+
+    /**
+     * Converts the selected file to .OPUS.
+     *
+     * @param artist The track artist
+     * @param title The track title
+     * @param bitrate The bitrate of the resultant audio in K, so 320 = 320K
+     * @return The Path to the converted File
+     * @throws IOException If something happened
+     */
+    public Path convertToOPUS(String artist, String title, int bitrate) throws IOException {
         //If Metadata Not Already Generated, Set it
         if (this.metadata.isEmpty()) {
             this.metadata.add(properMetadataFormat(artist));
@@ -119,9 +154,8 @@ public class StellarOPUSConverter {
         copyOP(() -> {
             try {
                 processImage();
-                processOP("ffmpeg", "-i", this.filePath.getFileName().toString(),
-                        "-y", "-b:a", "320k", "-metadata", "title=" + title,
-                        "-metadata", "artist=" + artist, "-strict", "-2", properMetadataFormat(title) + ".opus");
+                processOP(this.fileExtension.getGeneralConversionString(this.filePath.getFileName().toString(), properMetadataFormat(title),
+                        this.metadata, bitrate), false);
             } catch (InterruptedException | IOException ex) {
                 Logger.getLogger(StellarOPUSConverter.class.getName()).log(Level.SEVERE, null, ex);
                 System.err.println("Error encountered during conversion");
@@ -130,6 +164,34 @@ public class StellarOPUSConverter {
         //Clear Metadata to Restore Default State for next use
         this.metadata.clear();
         return Paths.get(this.diskManager.getOutputFolder().toString(), title + ".opus");
+    }
+
+    /**
+     * Decreases the selected opus file's bitrate. Only applicable if the
+     * selected file is an opus file. Useful for mobile opus libraries. Copies
+     * the file to the output folder. If not manually set, defaults to
+     * {@link StellarDiskManager#getOutputFolder()}.
+     *
+     * @return The path to the converted file
+     * @throws java.io.IOException If something happened
+     */
+    public Path decreaseOPUSBitrate() throws IOException {
+        if (this.fileExtension != FileExtension.OPUS) {
+            throw new IllegalStateException("File Extension is not .opus!");
+        } else {
+            this.metadata.add("Unknown Artist");
+            this.metadata.add(this.filePath.getFileName().toString().replace(".opus", ""));
+            copyOPSameFileName(() -> {
+                try {
+                    processOP(this.fileExtension.getLowBitrateConversion(this.filePath), false);
+                } catch (InterruptedException | IOException ex) {
+                    Logger.getLogger(StellarOPUSConverter.class.getName()).log(Level.SEVERE, null, ex);
+                    throw new RuntimeException(ex);
+                }
+            });
+            return Paths.get(this.outputFolder.toString(),
+                    properMetadataFormat(this.metadata.get(1)) + ".opus");
+        }
     }
 
     /**
@@ -252,12 +314,40 @@ public class StellarOPUSConverter {
     }
 
     /**
+     * /**
      * Launches a new process in the temp directory, and waits for its
      * completion.
      *
      * @param commands The commands to execute
+     * @throws InterruptedException If something went wrong
+     * @throws IOException InterruptedException If something went wrong
+     */
+    private void processOP(List<String> commands, boolean inheritIO) throws InterruptedException, IOException {
+        processOP(inheritIO, commands.toArray(new String[4]));
+    }
+
+    /**
+     * Launches a new process in the temp directory, and waits for its
+     * completion.
+     *
+     * @param commands The commands to execute
+     * @throws InterruptedException If something went wrong
+     * @throws IOException InterruptedException If something went wrong
      */
     private void processOP(String... commands) throws InterruptedException, IOException {
+        processOP(false, commands);
+    }
+
+    /**
+     * Launches a new process in the temp directory, and waits for its
+     * completion.
+     *
+     * @param inheritIO Should the streams be merged
+     * @param commands The commands to execute
+     * @throws InterruptedException If something went wrong
+     * @throws IOException InterruptedException If something went wrong
+     */
+    private void processOP(boolean inheritIO, String... commands) throws InterruptedException, IOException {
         System.out.println("About to Initiate (Temp Folder Path): " + this.diskManager.getTempDirectory());
         //Print out FFMPEG Command
         String s = "";
@@ -267,21 +357,38 @@ public class StellarOPUSConverter {
         }//"/home/sarah/Sarah Szabo -- The Fourtyth Divide.mp4"
         System.out.println("COMMAND: " + s);
         //Actually do it
-        Process proc = new ProcessBuilder(commands)
-                .directory(this.diskManager.getTempDirectory().toFile()).inheritIO().start();
+        Process proc = inheritIO ? new ProcessBuilder(commands)
+                .directory(this.diskManager.getTempDirectory().toFile()).inheritIO().start()
+                : new ProcessBuilder(commands).directory(this.diskManager.getTempDirectory().toFile()).start();
         proc.waitFor();
     }
 
     /**
-     * Launches a new process in the temp directory, and waits for its
-     * completion.
+     * Performs an operation after first copying the target file over to the
+     * temp directory. Ensures that the copied filename is the same as the
+     * original. Copies the file to the output folder. If not manually set,
+     * defaults to {@link StellarDiskManager#getOutputFolder()}.
      *
-     * @param command The command to execute
+     * @param operation The operations to perform
+     * @throws IOException If something happened
      */
-    private void processOP(String command) throws InterruptedException, IOException {
-        Process proc = new ProcessBuilder(command)
-                .directory(this.diskManager.getTempDirectory().toFile()).inheritIO().start();
-        proc.waitFor();
+    private void copyOPSameFileName(CopyOperation operation) throws IOException {
+        String originalFileName = this.filePath.getFileName().toString();
+        this.diskManager.copyToTemp(this.filePath);
+        operation.doOperation();
+        Path copyDummyPath = Paths.get(this.diskManager.getTempDirectory().toString(),
+                properMetadataFormat(originalFileName.replace(".opus", "(((Copy))).opus"))),
+                originalFileNamePath = Paths.get(this.diskManager.getTempDirectory().toString(), originalFileName);
+        //Logging
+        System.out.println("FROM: \n" + copyDummyPath);
+        System.out.println("Exists? " + Files.exists(copyDummyPath));
+        System.out.println("TO: " + originalFileNamePath);
+        System.out.println("Exists? " + Files.exists(originalFileNamePath));
+        //Move to same directory to take the place of the original file
+        Files.move(copyDummyPath, originalFileNamePath, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+        //Copy to Output Folder, due to different output folder, use custom copy operation
+        Files.move(originalFileNamePath, Paths.get(this.outputFolder.toString(),
+                originalFileNamePath.getFileName().toString()), StandardCopyOption.REPLACE_EXISTING);
     }
 
     /**
@@ -303,7 +410,7 @@ public class StellarOPUSConverter {
      *
      * @return The filename
      */
-    private String getFileName() {
+    private String getImageFileName() {
         return properMetadataFormat(this.metadata.get(0)) + " -- "
                 + properMetadataFormat(this.metadata.get(1)) + ".png";
     }
@@ -317,15 +424,18 @@ public class StellarOPUSConverter {
     private void processImage() throws IOException, InterruptedException {
         synchronized (StellarOPUSConverter.class) {
             //Check if Image Already Exists
-            if (Files.exists(Paths.get(this.diskManager.getOutputFolder().toString(), getFileName()))) {
+            if (Files.exists(Paths.get(this.diskManager.getOutputFolder().toString(), getImageFileName()))) {
                 return;
             }
             //ffmpeg -ss 25 -i input.mp4 -qscale:v 2 -frames:v 1 -huffman optimal output.jpg
             processOP("ffmpeg", "-ss", "30", "-i", filePath.getFileName().toString(), "-y", "-qscale:v", "2",
-                    "-frames:v", "1", "-huffman", "optimal", getFileName());
+                    "-frames:v", "1", "-huffman", "optimal", getImageFileName());
             //Remove This Once This Becomes Automated
-            Files.copy(Paths.get(this.diskManager.getTempDirectory().toString(), getFileName()),
-                    Paths.get(this.diskManager.getOutputFolder().toString(), getFileName()));
+            //Check for Image Existance
+            if (Files.exists(Paths.get(this.diskManager.getTempDirectory().toString(), getImageFileName()))) {
+                Files.copy(Paths.get(this.diskManager.getTempDirectory().toString(), getImageFileName()),
+                        Paths.get(this.diskManager.getOutputFolder().toString(), getImageFileName()));
+            }
         }
     }
 
@@ -339,5 +449,107 @@ public class StellarOPUSConverter {
          * The operation to perform.
          */
         void doOperation();
+    }
+
+    /**
+     * An enum representing a file extension.
+     */
+    private enum FileExtension {
+        /**
+         * Already Existing OPUS Files. The bitrate option does not apply here
+         * since we are copying the bitrate over.
+         */
+        OPUS {
+            @Override
+            public List<String> getGeneralConversionString(String inputFileName, String outputFileName, List<String> metadata,
+                    int bitrate) {
+                //ffmpeg -i HI.opus -c copy -metadata artist="Someone" output.opus
+                return new ProcessBuilder("ffmpeg", inputFileName, "-c", "copy", "-y", "-metadata", "title=" + metadata.get(1),
+                        "-metadata", "artist=" + metadata.get(0), "-strict", "-2", properMetadataFormat(outputFileName + ".opus")).command();
+            }
+
+            @Override
+            public String toString() {
+                return ".opus";
+            }
+
+            @Override
+            public List<String> getLowBitrateConversion(Path inputFile) {
+                //ffmpeg -i Hotlines.opus -b:a 120k -strict -2 HL3.opus
+                return new ProcessBuilder("ffmpeg", "-i", inputFile.getFileName().toString(), "-b:a", "120k", "-strict",
+                        "-2", properMetadataFormat(inputFile.getFileName().toString().replace(".opus", "") + "(((Copy))).opus")).command();
+            }
+        },
+        /**
+         * MP4 Files.
+         */
+        MP4 {
+            @Override
+            public List<String> getGeneralConversionString(String inputFileName, String outputFileName, List<String> metadata,
+                    int bitrate) {
+                return new ProcessBuilder("ffmpeg", "-i", inputFileName,
+                        "-y", "-b:a", bitrate + "k", "-metadata", "title=" + metadata.get(1),
+                        "-metadata", "artist=" + metadata.get(0), "-strict", "-2", properMetadataFormat(outputFileName + ".opus")).command();
+            }
+
+            @Override
+            public String toString() {
+                return ".mp4";
+            }
+
+            @Override
+            public List<String> getLowBitrateConversion(Path inputFile) {
+                throw new UnsupportedOperationException("Not supported yet.");
+            }
+
+        },
+        /**
+         * MP3 Files.
+         */
+        MP3 {
+            @Override
+            public List<String> getGeneralConversionString(String inputFileName, String outputFileName, List<String> metadata,
+                    int bitrate) {
+                return new ProcessBuilder("ffmpeg", "-i", inputFileName,
+                        "-y", "-b:a", bitrate + "k", "-metadata", "title=" + metadata.get(1),
+                        "-metadata", "artist=" + metadata.get(0), "-strict", "-2", properMetadataFormat(outputFileName + ".opus")).command();
+            }
+
+            @Override
+            public String toString() {
+                return ".mp3";
+            }
+
+            @Override
+            public List<String> getLowBitrateConversion(Path inputFile) {
+                throw new UnsupportedOperationException("Not supported yet.");
+            }
+        };
+
+        /**
+         * Gets the low bitrate conversion (120K) and saves it to
+         * {@link StellarDiskManager#getOutputFolder()}.
+         *
+         * @param inputFile The path of the input file
+         * @return The list of commands needing execution
+         */
+        public abstract List<String> getLowBitrateConversion(Path inputFile);
+
+        /**
+         * Gets the conversion string for
+         * {@link StellarOPUSConverter#processOP(java.lang.String...)}, give it
+         * the input file name, and the output file name, and it will give you
+         * the string list necessary to do the operation.
+         *
+         * @param inputFileName The filename of the input file, should contain
+         * the file extension
+         * @param outputFileName The filename of the output file, should NOT
+         * contain the file extension
+         * @return The process necessary to convert this filetype to OPUS.
+         */
+        public abstract List<String> getGeneralConversionString(String inputFileName, String outputFileName, List<String> metadata,
+                int bitrate);
+
+        public abstract String toString();
     }
 }

@@ -16,6 +16,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
+import java.util.Objects;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import org.apache.commons.io.FileUtils;
@@ -84,9 +85,10 @@ public enum StellarDiskManager {
             }
             if (Files.notExists(PREVIOUS_CONFIGURATION)) {
                 //Set Previous State, by default is the program folder
-                DiskManagerState state = new DiskManagerState(StellarUI.getOutputFolderFor("Converted Files")
+                DiskManagerState state = new DiskManagerState(StellarUI.getFolderFor("Converted Files")
                         .orElse(USER_DIR),
-                        StellarUI.getOutputFolderFor("Picture Folder").orElse(USER_DIR));
+                        StellarUI.getFolderFor("Picture Folder").orElse(USER_DIR),
+                        StellarUI.getFolderFor("Space Bridge").orElse(USER_DIR));
                 mapper.writeValue(PREVIOUS_CONFIGURATION.toFile(), state);
                 System.out.println("The output directory is now set to: " + state.getOutputFolder()
                         + "\nThe picture output directory is set to: " + state.getPictureOutputFolder());
@@ -102,11 +104,20 @@ public enum StellarDiskManager {
     }
 
     /**
+     * Changes the space-bridge watch folder to the one specified.
+     *
+     * @param newPath The New Folder Path
+     */
+    public static synchronized void setSpaceBridgeDirectory(Path newPath) {
+        spaceBridgeDirectory = newPath;
+    }
+
+    /**
      * Changes the picture output folder to the one specified.
      *
      * @param newPath The New Folder Path
      */
-    public static synchronized void changePictureOutputFolder(Path newPath) {
+    public static synchronized void setPictureOutputFolder(Path newPath) {
         pictureOutputFolder = newPath;
     }
 
@@ -117,11 +128,11 @@ public enum StellarDiskManager {
      * @param newOutputFolder The path of the output folder
      * @throws java.io.IOException If something happened
      */
-    public static synchronized void changeOutputFolder(Path newOutputFolder) throws IOException {
+    public static synchronized void setOutputFolder(Path newOutputFolder) throws IOException {
         outputFolder = newOutputFolder;
     }
 
-    private static Path outputFolder = USER_DIR, pictureOutputFolder = USER_DIR;
+    private static Path outputFolder = USER_DIR, pictureOutputFolder = USER_DIR, spaceBridgeDirectory;
     private static final Path tempDirectory;
 
     static {
@@ -129,10 +140,7 @@ public enum StellarDiskManager {
             DiskManagerState state = initialSetUp();
             outputFolder = state.getOutputFolder();
             pictureOutputFolder = state.getPictureOutputFolder();
-            if (pictureOutputFolder == null) {
-                pictureOutputFolder = StellarUI.getOutputFolderFor("Picture Output Folder").orElse(USER_DIR);
-                System.out.println("Picture Output Folder Changed to: " + pictureOutputFolder);
-            }
+            spaceBridgeDirectory = state.getSpaceBridgeDirectory();
             //Create Temp Directory & Set Deletion Hook
             tempDirectory = Files.createTempDirectory("Stellar OPUS Converter Temporary Directory");
             Runtime.getRuntime().addShutdownHook(new Thread(() -> {
@@ -140,7 +148,8 @@ public enum StellarDiskManager {
                     //Delete Temp Folder =D
                     FileUtils.deleteQuietly(tempDirectory.toFile());
                     //Save Settings
-                    mapper.writeValue(PREVIOUS_CONFIGURATION.toFile(), new DiskManagerState(outputFolder, pictureOutputFolder));
+                    mapper.writeValue(PREVIOUS_CONFIGURATION.toFile(), new DiskManagerState(outputFolder, pictureOutputFolder,
+                            spaceBridgeDirectory));
                 } catch (IOException ex) {
                     Logger.getLogger(StellarDiskManager.class.getName()).log(Level.SEVERE, null, ex);
                     System.err.println("Oh Noes! The cleanup thread had an exception!\n\n");
@@ -210,29 +219,21 @@ public enum StellarDiskManager {
      * @return The current state of the disk manager
      */
     public DiskManagerState getState() {
-        return new DiskManagerState(outputFolder, pictureOutputFolder);
+        return new DiskManagerState(outputFolder, pictureOutputFolder, spaceBridgeDirectory);
     }
 
     /**
      * An abstraction representing the previous state of the program.
      */
     @JsonIgnoreProperties(ignoreUnknown = true)
-    static final class DiskManagerState {
+    public static final class DiskManagerState {
 
         @JsonProperty("outputFolder")
         private final Path outputFolder;
-
         @JsonProperty("pictureOutputFolder")
         private final Path pictureOutputFolder;
-
-        /**
-         * Creates a new disk manager state with the specified output folder.
-         *
-         * @param outputFolder
-         */
-        DiskManagerState(Path outputFolder) {
-            this(outputFolder, Paths.get(""));
-        }
+        @JsonProperty("spaceBridgeDirectory")
+        private final Path spaceBridgeDirectory;
 
         /**
          * Creates a new disk manager with the specified output folder.
@@ -241,9 +242,20 @@ public enum StellarDiskManager {
          */
         @JsonCreator
         DiskManagerState(@JsonProperty("outputFolder") Path outputFolder,
-                @JsonProperty("pictureOutputFolder") Path pictureOutputFolder) {
-            this.outputFolder = outputFolder;
-            this.pictureOutputFolder = pictureOutputFolder;
+                @JsonProperty("pictureOutputFolder") Path pictureOutputFolder,
+                @JsonProperty("spaceBridgeDirectory") Path spaceBridgeDirectory) {
+            this.outputFolder = Objects.requireNonNull(outputFolder);
+            this.pictureOutputFolder = Objects.requireNonNull(pictureOutputFolder);
+            this.spaceBridgeDirectory = Objects.requireNonNull(spaceBridgeDirectory);
+        }
+
+        /**
+         * A getter for the space bridge directory
+         *
+         * @return The path to the directory
+         */
+        public Path getSpaceBridgeDirectory() {
+            return spaceBridgeDirectory;
         }
 
         /**
