@@ -6,6 +6,7 @@
 package com.protonmail.sarahszabo.stellaropusconverter;
 
 import java.io.IOException;
+import java.nio.file.FileVisitOption;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -16,6 +17,8 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Stream;
 import org.slf4j.LoggerFactory;
+import static com.protonmail.sarahszabo.stellaropusconverter.util.StellarGravitonField.*;
+import org.apache.commons.io.FileUtils;
 
 /**
  * A class that oversees conversions in a certain folder and converts them to
@@ -50,33 +53,12 @@ public enum SpaceBridge {
             if (Files.notExists(this.log)) {
                 Files.createFile(this.log);
             }
-            //System.setOut(new PrintStream(log.toFile()));
-            //System.setErr(new PrintStream(log.toFile()));
             enterLog("SpaceBridge Initial Setup Complete!");
         } catch (IOException ex) {
             Logger.getLogger(SpaceBridge.class.getName()).log(Level.SEVERE, null, ex);
             enterExceptionIntoLog("Constructor", ex);
             throw new RuntimeException(ex);
         }
-    }
-
-    /**
-     * Enters an exception into the permanant log.
-     *
-     * @param location The code location where the exception occurred.
-     * @param ex The exception
-     */
-    private void enterExceptionIntoLog(String location, Exception ex) {
-        enterLog("Exception Encountered <" + location + ">: " + ex.getMessage());
-    }
-
-    /**
-     * Enters a log into the log file with the timestamp
-     *
-     * @param log The log to enter
-     */
-    private void enterLog(String log) {
-        System.out.println(log + " || " + LocalDateTime.now());
     }
 
     /**
@@ -93,13 +75,25 @@ public enum SpaceBridge {
     }
 
     /**
+     * Gets a stream of the walk of the watched directory minus "Space-Bridge"
+     * folders. Excludes all directories and only gets a stream of files.
+     *
+     * @return The stream
+     * @throws IOException If something went wrong
+     */
+    private Stream<Path> fileWalkFilterUsNoDirectories() throws IOException {
+        return fileWalkFilterUs().filter(path -> !Files.isDirectory(path)).distinct();
+    }
+
+    /**
      * Gets a stream of the walk of the watched directory minus our folders.
      *
      * @return The stream
      * @throws IOException If something went wrong
      */
     private Stream<Path> fileWalkFilterUs() throws IOException {
-        return Files.walk(this.watching).filter(path -> !path.toString().contains(this.completed.getFileName().toString()));
+        return Files.walk(this.watching, FileVisitOption.FOLLOW_LINKS)
+                .filter(path -> !path.toString().contains(this.completed.getFileName().toString())).distinct();
     }
 
     /**
@@ -108,26 +102,43 @@ public enum SpaceBridge {
      * @throws java.io.IOException If something happened
      */
     public void initBridge() throws IOException {
+        enterLog("\n\nAbout to Mirror Directories");
         //Mirror Directories
         fileWalkFilterUs().filter(path -> Files.isDirectory(path)).forEachOrdered(folder -> {
             try {
-                Files.createDirectories(getCopyPath(folder));
+                Path folderPath = getCopyPath(folder);
+                Files.createDirectories(folderPath);
+                enterLog("Created Folder: " + folderPath);
             } catch (IOException ex) {
                 Logger.getLogger(SpaceBridge.class.getName()).log(Level.SEVERE, null, ex);
                 enterExceptionIntoLog("Init Bridge, Create Directories", ex);
                 throw new RuntimeException(ex);
             }
         });
+        //Purge Non .opus files in the space-bridge directory
+        enterLog("About to scan for non .opus files");
+        Files.walk(this.completed, FileVisitOption.FOLLOW_LINKS).filter(path -> !Files.isDirectory(path)
+                && !path.getFileName().toString().contains(".opus")).forEach(path -> {
+            FileUtils.deleteQuietly(path.toFile());
+            enterLog(path + " deleted");
+        });
+        enterLog("\n\nMirroring Process Complete");
+        enterLog("\n\nAbout to Mirror And Convert Files to 120K");
         //Check if Converted Files Exist Already, if Not Convert Them
         //No Directories, File Must be .opus, File Should Not Already Be Indexed
-        fileWalkFilterUs().filter(path -> !Files.isDirectory(path) && path.getFileName().toString().contains(".opus")
+        fileWalkFilterUsNoDirectories().filter(path -> stringContains(path.getFileName().toString(), ".opus",
+                ".mp3", ".ogg")
                 && !Files.exists(getCopyPath(path)))
                 .forEachOrdered(file -> {
                     Future<Path> future = StellarHyperspace.getHyperspace().submit(() -> {
-                        //Doesn't Exist, Convert to 120K
+                        String entry = enterLogString("About to Convert " + file);
+                        //Doesn't Exist in Destination, Convert to 120K
                         StellarOPUSConverter converter = new StellarOPUSConverter(file, getCopyPath(file).getParent());
-                        return converter.decreaseOPUSBitrate();
+                        Path path = converter.decreaseBitrate();
+                        enterLog("\nFile Convertion Complete: " + path);
+                        return path;
                     });
+                    enterLog("All Tasks Submitted Succesfully!");
                     StellarHyperspace.getSpaceBridge().submit(() -> {
                         try {
                             enterLog(future.get() + " Converted Succesfully!");
