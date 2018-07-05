@@ -18,6 +18,7 @@ import java.util.logging.Logger;
 import java.util.stream.Stream;
 import org.slf4j.LoggerFactory;
 import static com.protonmail.sarahszabo.stellaropusconverter.util.StellarGravitonField.*;
+import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
 
 /**
@@ -125,10 +126,12 @@ public enum SpaceBridge {
         enterLog("\n\nMirroring Process Complete");
         enterLog("\n\nAbout to Mirror And Convert Files to 120K");
         //Check if Converted Files Exist Already, if Not Convert Them
-        //No Directories, File Must be .opus, File Should Not Already Be Indexed
+        //No Directories, File Must be of expected file type, File Should Not Already Be Indexed
         fileWalkFilterUsNoDirectories().filter(path -> stringContains(path.getFileName().toString(), ".opus",
                 ".mp3", ".ogg")
-                && !Files.exists(getCopyPath(path)))
+                //Replace Possible Other Filenames, all files are just .opus in the Space-Bridge Directory
+                && !Files.exists(getCopyPath(Paths.get(path.getParent().toString(), path.getFileName().toString()
+                        .replace("[.][^.]+$", ".opus")))))
                 .forEachOrdered(file -> {
                     Future<Path> future = StellarHyperspace.getHyperspace().submit(() -> {
                         String entry = enterLogString("About to Convert " + file);
@@ -138,7 +141,6 @@ public enum SpaceBridge {
                         enterLog("\nFile Convertion Complete: " + path);
                         return path;
                     });
-                    enterLog("All Tasks Submitted Succesfully!");
                     StellarHyperspace.getSpaceBridge().submit(() -> {
                         try {
                             enterLog(future.get() + " Converted Succesfully!");
@@ -149,6 +151,14 @@ public enum SpaceBridge {
                     });
 
                 });
+        enterLog("All Conversion Tasks Submitted to Hyperspace");
+        //Shut Down, then Await Termination of Hyperspace Task Executor
+        try {
+            StellarHyperspace.initiateFalseVacuum();
+            StellarHyperspace.getHyperspace().awaitTermination(Long.MAX_VALUE, TimeUnit.DAYS);
+        } catch (InterruptedException ex) {
+            Logger.getLogger(SpaceBridge.class.getName()).log(Level.SEVERE, null, ex);
+        }
         enterLog("Space-Bridge Conversions Complete!");
     }
 }
