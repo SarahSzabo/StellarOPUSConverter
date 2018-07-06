@@ -22,7 +22,13 @@ public class Main {
      * @param args the command line arguments
      */
     public static void main(String[] args) throws IOException {
-        if (args.length == 0) {
+        //We have to check greater than section first, then we check integer comparison
+        //Odd Number of Entries >= 3 (URL, timestamp0 timestamp1 timestamp2 timestamp3
+        if (args.length >= 3 && firstArgIsLink(args[0]) && (args.length + 1) % 2 == 0
+                && allStringsAreTimestamps(args)) {
+            StellarMode.LINK_TIMESTAMPS.start(args);
+        } //Rest of integer comparisons
+        else if (args.length == 0) {
             System.out.println("There is no file specified!\n");
             printHelp();
         } //Direct Link Conversion
@@ -74,10 +80,6 @@ public class Main {
             } else {
                 printHelp();
             }
-        }//Odd Number of Entries >= 3 (URL, timestamp0 timestamp1 timestamp2 timestamp3
-        else if (args.length >= 3 && firstArgIsLink(args[0]) && (args.length + 1) % 2 == 0
-                && allStringsAreTimestamps(args)) {
-            StellarMode.LINK_TIMESTAMPS.start(args);
         } else {
             printHelp();
         }

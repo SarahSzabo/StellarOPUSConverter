@@ -6,6 +6,9 @@
 package com.protonmail.sarahszabo.stellaropusconverter;
 
 import static com.protonmail.sarahszabo.stellaropusconverter.util.StellarGravitonField.*;
+import com.protonmail.sarahszabo.stellaropusconverter.util.stellarcartography.LogLevel;
+import com.protonmail.sarahszabo.stellaropusconverter.util.stellarcartography.NebulaCartographer;
+import com.protonmail.sarahszabo.stellaropusconverter.util.stellarcartography.StellarCartographer;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -55,6 +58,7 @@ public class StellarOPUSConverter {
     private final List<String> metadata;
     private final StellarDiskManager diskManager;
     private final FileExtension fileExtension;
+    private final StellarCartographer<?> cartographer;
 
     /**
      * Constructs a new {@link StellarOPUSConverter} with the specified file
@@ -62,11 +66,13 @@ public class StellarOPUSConverter {
      *
      * @param filePath The file for conversion
      * @param outputFolder The path to put the finished file in
+     * @param cartographer The cartographer to use with this converter
      * @throws java.io.IOException If something happened
      */
-    public StellarOPUSConverter(Path filePath, Path outputFolder) throws IOException {
+    public StellarOPUSConverter(Path filePath, Path outputFolder, StellarCartographer<?> cartographer) throws IOException {
         this.filePath = Objects.requireNonNull(filePath);
         this.outputFolder = Objects.requireNonNull(outputFolder);
+        this.cartographer = Objects.requireNonNull(cartographer);
         this.diskManager = StellarDiskManager.DISKMANAGER;
         //Gets only the file name without extension
         this.fileNameNoEXT = stripFileExtension(filePath);
@@ -85,6 +91,18 @@ public class StellarOPUSConverter {
         }
         this.trueFileName = this.fileNameNoEXT + ".opus";
         this.metadata = new ArrayList<>(2);
+    }
+
+    /**
+     * Constructs a new {@link StellarOPUSConverter} with the specified file
+     * path and manually specified output folder.
+     *
+     * @param filePath The file for conversion
+     * @param outputFolder The path to put the finished file in
+     * @throws java.io.IOException If something happened
+     */
+    public StellarOPUSConverter(Path filePath, Path outputFolder) throws IOException {
+        this(filePath, outputFolder, new NebulaCartographer<StellarOPUSConverter>(LogLevel.DEFAULT));
     }
 
     /**
@@ -145,7 +163,7 @@ public class StellarOPUSConverter {
                         this.metadata, bitrate), false);
             } catch (InterruptedException | IOException ex) {
                 Logger.getLogger(StellarOPUSConverter.class.getName()).log(Level.SEVERE, null, ex);
-                enterExceptionIntoLog("Error encountered during conversion", ex);
+                this.cartographer.logException("Error encountered during conversion", ex);
             }
         });
         //Clear Metadata to Restore Default State for next use
@@ -364,8 +382,8 @@ public class StellarOPUSConverter {
                 preferredTitleFormat(originalFileName.replace(this.fileExtension.toString(), "(((Copy))).opus"))),
                 originalFileNamePath = Paths.get(this.diskManager.getTempDirectory().toString(), originalFileName);
         //Logging
-        enterLog("FROM: \n" + copyDummyPath);
-        enterLog("TO: " + originalFileNamePath);
+        this.cartographer.log("FROM: \n" + copyDummyPath);
+        this.cartographer.log("TO: " + originalFileNamePath);
         try {
             //Move to same directory to take the place of the original file
             Files.move(copyDummyPath, originalFileNamePath, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
@@ -373,7 +391,7 @@ public class StellarOPUSConverter {
             Files.move(originalFileNamePath, Paths.get(this.outputFolder.toString(),
                     originalFileNamePath.getFileName().toString()), StandardCopyOption.REPLACE_EXISTING);
         } catch (Exception ex) {
-            enterExceptionIntoLog("copyOP -> Move Section", ex);
+            this.cartographer.logException("copyOP -> Move Section", ex);
             //throw new RuntimeException(ex);
         }
     }
