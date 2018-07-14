@@ -5,6 +5,8 @@
  */
 package com.protonmail.sarahszabo.stellaropusconverter;
 
+import static com.protonmail.sarahszabo.stellaropusconverter.util.StellarGravitonField.messageThenExit;
+import com.protonmail.sarahszabo.stellaropusconverter.util.StellarGreatFilter;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -41,9 +43,14 @@ public class Main {
             } //Get From Clipboard
             else if (args[0].equalsIgnoreCase("-CL")) {
                 StellarMode.GET_FROM_CLIPBOARD.start(args);
-            } else if (args[0].equalsIgnoreCase("Status")) {
+            } //Initiate Region Scan, Applying all filters from grand filter
+            else if (args[0].equalsIgnoreCase("Region-Scan")) {
+                StellarGreatFilter.filterPaths(StellarUI.getFilesFromClipboard());
+            } //Ask For Status of Folder Paths
+            else if (args[0].equalsIgnoreCase("Status")) {
                 System.out.println(StellarDiskManager.DISKMANAGER.getState());
-            } else if (args[0].equalsIgnoreCase("Space-Bridge")) {
+            } //Initialise Space-Bridge
+            else if (args[0].equalsIgnoreCase("Space-Bridge")) {
                 stellarConversion(StellarMode.SPACE_BRIDGE, args);
             } else {
                 printHelp();
@@ -52,7 +59,7 @@ public class Main {
             //-CL With All Same Artist
             if (args[0].equalsIgnoreCase("-CL")) {
                 stellarConversion(StellarMode.CLIPBOARD_SAME_ARTIST, args);
-            } //Change Settings
+            }//Change Settings
             else if (args[0].equalsIgnoreCase("Set")) {
                 if (args[1].equalsIgnoreCase("Pictures-Folder")) {
                     Path path = StellarUI.getFolderFor("Picture Folder")
@@ -127,15 +134,9 @@ public class Main {
      * Prints the help doc.
      */
     private static void printHelp() throws IOException {
-        messageThenExit(StellarDiskManager.readHelpText());
-    }
-
-    /**
-     * Helper method, prints the message then System.exit().
-     */
-    private static void messageThenExit(String message) {
-        System.out.println(message);
-        System.exit(0);
+        String message = StellarDiskManager.readHelpText();
+        message += "\n\n" + StellarDiskManager.getState();
+        messageThenExit(message);
     }
 
     /**

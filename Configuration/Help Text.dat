@@ -18,6 +18,9 @@ Alternate Modes:
 Space-Bridge = Enables the Space-Bridge Mobile Conversion Functionality. This watches a certain directory and all sub-directories
  and converts them to 120K for mobile devices.
 
+Region-Scan = Scans the Clipboard for Files whose names can be optimised.
+Applies filters to the names and changes them. Retains original file extensions.
+
 Settings:
 Set Pictures-Folder = Change the Picture Output Folder
 Set Output-Folder = Change the Output Folder for Files

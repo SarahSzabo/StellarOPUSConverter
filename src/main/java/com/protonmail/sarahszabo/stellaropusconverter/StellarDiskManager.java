@@ -11,6 +11,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.exc.InvalidDefinitionException;
 import com.fasterxml.jackson.databind.exc.UnrecognizedPropertyException;
+import com.protonmail.sarahszabo.stellaropusconverter.util.StellarLoggingFormatter;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -56,6 +57,8 @@ public enum StellarDiskManager {
      */
     public static final ObjectMapper mapper = new ObjectMapper();
 
+    private static final Logger logger = StellarLoggingFormatter.forClass(StellarDiskManager.class);
+
     /**
      * Gets the help text from the help text file.
      *
@@ -90,7 +93,7 @@ public enum StellarDiskManager {
                         StellarUI.getFolderFor("Picture Folder").orElse(USER_DIR),
                         StellarUI.getFolderFor("Space Bridge").orElse(USER_DIR));
                 mapper.writeValue(PREVIOUS_CONFIGURATION.toFile(), state);
-                System.out.println("The output directory is now set to: " + state.getOutputFolder()
+                logger.info("The output directory is now set to: " + state.getOutputFolder()
                         + "\nThe picture output directory is set to: " + state.getPictureOutputFolder());
                 return state;
             } else {
@@ -168,8 +171,8 @@ public enum StellarDiskManager {
      * @param filePath The file to copy
      * @throws IOException If something happened
      */
-    public void copyToTemp(Path filePath) throws IOException {
-        System.out.println(tempDirectory);
+    public static void copyToTemp(Path filePath) throws IOException {
+        logger.info(tempDirectory.toString());
         Files.copy(filePath, Paths.get(tempDirectory.toString(), filePath.getFileName().toString()),
                 StandardCopyOption.REPLACE_EXISTING);
     }
@@ -180,10 +183,10 @@ public enum StellarDiskManager {
      * @param fileName The filename to move
      * @throws IOException If something went wrong
      */
-    public void copyFromTemp(String fileName) throws IOException {
-        System.out.println("\n\nFile Copy Exists in Temp Folder: " + Files.exists(Paths.get(tempDirectory.toString(), fileName)));
+    public static void copyFromTemp(String fileName) throws IOException {
+        logger.info("\n\nFile Copy Exists in Temp Folder: " + Files.exists(Paths.get(tempDirectory.toString(), fileName)));
         Files.copy(Paths.get(tempDirectory.toString(), fileName),
-                Paths.get(this.outputFolder.toString(), fileName), StandardCopyOption.REPLACE_EXISTING);
+                Paths.get(outputFolder.toString(), fileName), StandardCopyOption.REPLACE_EXISTING);
     }
 
     /**
@@ -191,7 +194,7 @@ public enum StellarDiskManager {
      *
      * @return The path
      */
-    public Path getPictureOutputFolder() {
+    public static Path getPictureOutputFolder() {
         return pictureOutputFolder;
     }
 
@@ -200,7 +203,7 @@ public enum StellarDiskManager {
      *
      * @return The output folder
      */
-    public Path getOutputFolder() {
+    public static Path getOutputFolder() {
         return outputFolder;
     }
 
@@ -209,7 +212,7 @@ public enum StellarDiskManager {
      *
      * @return The temporary directory path
      */
-    public Path getTempDirectory() {
+    public static Path getTempDirectory() {
         return tempDirectory;
     }
 
@@ -218,7 +221,7 @@ public enum StellarDiskManager {
      *
      * @return The current state of the disk manager
      */
-    public DiskManagerState getState() {
+    public static DiskManagerState getState() {
         return new DiskManagerState(outputFolder, pictureOutputFolder, spaceBridgeDirectory);
     }
 
@@ -278,7 +281,8 @@ public enum StellarDiskManager {
 
         @Override
         public String toString() {
-            return "Output Folder: " + this.outputFolder + "\nPictures Folder: " + this.pictureOutputFolder;
+            return "Disk Manager State: \nOutput Folder: " + this.outputFolder
+                    + "\nPictures Folder: " + this.pictureOutputFolder + "\nSpace-Bridge Output Folder: " + this.spaceBridgeDirectory;
         }
 
     }

@@ -32,11 +32,11 @@ import org.controlsfx.control.Notifications;
  *
  * @author Sarah Szabo <PhysicistSarah@Gmail.com>
  */
-public class StellarUI {
-
-    private static final BlockingQueue<List<File>> PATHS_QUEUE = new ArrayBlockingQueue<>(2);
-    private static final BlockingQueue<File> OUTPUT_FOLDER_QUEUE = new ArrayBlockingQueue<>(2);
-    private static final BlockingQueue<Optional<String>> ASK_USER_METADATA = new ArrayBlockingQueue<>(2);
+public enum StellarUI {
+    ;
+    private static final BlockingQueue<List<File>> PATHS_QUEUE = new ArrayBlockingQueue<>(1);
+    private static final BlockingQueue<File> OUTPUT_FOLDER_QUEUE = new ArrayBlockingQueue<>(1);
+    private static final BlockingQueue<Optional<String>> ASK_USER_METADATA = new ArrayBlockingQueue<>(1);
 
     static {
         //Initialize Toolkit
@@ -81,7 +81,7 @@ public class StellarUI {
      * @return The list containing the information
      */
     public static List<String> askUserForArtistTitle() {
-        return askUserForArtistTitle(null);
+        return askUserForArtistTitle("");
     }
 
     /**

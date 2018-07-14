@@ -38,18 +38,6 @@ public class StellarHyperspace {
             return new Thread(r, "Stellar Hyperspace Thread " + threadCount++);
         }
     });
-    private static final ExecutorService spaceBridge = Executors.newSingleThreadExecutor((Runnable r) -> {
-        return new Thread(r, "Stellar Space-Bridge Logging Thread");
-    });
-
-    /**
-     * Gets the space bridge executor.
-     *
-     * @return The space bridge executor
-     */
-    public static ExecutorService getSpaceBridge() {
-        return spaceBridge;
-    }
 
     /**
      * Gets the hyperspace executor.
@@ -61,15 +49,14 @@ public class StellarHyperspace {
     }
 
     /**
-     * Causes a false vacuum, clearing the hyperspace of any new requests.
+     * Causes a false vacuum, clearing the hyperspace of any new requests, then
+     * waits for all executors to shutdown.
      *
      * @throws java.lang.InterruptedException if the thread was interrupted
      */
     public static void initiateFalseVacuum() throws InterruptedException {
         hyperspace.shutdown();
         hyperspace.awaitTermination(Long.MAX_VALUE, TimeUnit.DAYS);
-        spaceBridge.shutdown();
-        spaceBridge.awaitTermination(Long.MAX_VALUE, TimeUnit.DAYS);
     }
 
     /**

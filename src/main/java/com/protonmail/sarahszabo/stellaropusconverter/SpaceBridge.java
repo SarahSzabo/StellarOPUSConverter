@@ -5,26 +5,17 @@
  */
 package com.protonmail.sarahszabo.stellaropusconverter;
 
+import static com.protonmail.sarahszabo.stellaropusconverter.util.StellarGravitonField.*;
+import com.protonmail.sarahszabo.stellaropusconverter.util.StellarLoggingFormatter;
 import java.io.IOException;
 import java.nio.file.FileVisitOption;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.time.LocalDateTime;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Stream;
-import org.slf4j.LoggerFactory;
-import static com.protonmail.sarahszabo.stellaropusconverter.util.StellarGravitonField.*;
-import com.protonmail.sarahszabo.stellaropusconverter.util.stellarcartography.LogLevel;
-import com.protonmail.sarahszabo.stellaropusconverter.util.stellarcartography.NebulaCartographer;
-import com.protonmail.sarahszabo.stellaropusconverter.util.stellarcartography.StellarCartographer;
-import com.protonmail.sarahszabo.stellaropusconverter.util.stellarcartography.TerrestrialCartographer;
-import com.protonmail.sarahszabo.stellaropusconverter.util.stellarcartography.modules.BufferingModule;
-import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
 import org.apache.commons.io.FileUtils;
 
 /**
@@ -36,13 +27,13 @@ import org.apache.commons.io.FileUtils;
 public enum SpaceBridge {
 
     /**
-     * The instance of space-bridge.
+     * The instance newPath space-bridge.
      */
     SPACE_BRIDGE;
 
     private final StellarDiskManager diskManager = StellarDiskManager.DISKMANAGER;
-    private final Path watching, completed, logFolder, log;
-    private final StellarCartographer<SpaceBridge> cartographer, exceptionCartographer;
+    private final Path watching, completed, logFolder, logFile;
+    private final Logger logger = StellarLoggingFormatter.forClass(SpaceBridge.class);
 
     /**
      * Constructor for {@link SpaceBridge}. Sets up the initial state.
@@ -55,18 +46,14 @@ public enum SpaceBridge {
             //Our completed files go here
             this.completed = Paths.get(this.watching.toString(), "Space-Bridge Completed");
             this.logFolder = Paths.get("", "Log Files");
-            this.log = Paths.get(this.logFolder.toString(), "Log.dat");
+            this.logFile = Paths.get(this.logFolder.toString(), "Log.dat");
             Files.createDirectories(this.logFolder);
-            if (Files.notExists(this.log)) {
-                Files.createFile(this.log);
+            if (Files.notExists(this.logFile)) {
+                Files.createFile(this.logFile);
             }
-            this.cartographer = new TerrestrialCartographer<SpaceBridge>("Space-Bridge Log.dat", LogLevel.DEFAULT,
-                    Stream.of(new BufferingModule()).collect(Collectors.toList()));
-            this.exceptionCartographer = new TerrestrialCartographer<>("Space-Bridge Exception Log.dat", LogLevel.EXCEPTION);
-            this.cartographer.log("SpaceBridge Initial Setup Complete!");
+            this.logger.log(Level.INFO, "SpaceBridge Initial Setup Complete!");
         } catch (IOException ex) {
             Logger.getLogger(SpaceBridge.class.getName()).log(Level.SEVERE, null, ex);
-            new NebulaCartographer<>(LogLevel.EXCEPTION).logException("Constructor", ex);
             throw new RuntimeException(ex);
         }
     }
@@ -85,8 +72,9 @@ public enum SpaceBridge {
     }
 
     /**
-     * Gets a stream of the walk of the watched directory minus "Space-Bridge"
-     * folders. Excludes all directories and only gets a stream of files.
+     * Gets a stream newPath the walk newPath the watched directory minus
+     * "Space-Bridge" folders. Excludes all directories and only gets a stream
+     * newPath files.
      *
      * @return The stream
      * @throws IOException If something went wrong
@@ -96,7 +84,8 @@ public enum SpaceBridge {
     }
 
     /**
-     * Gets a stream of the walk of the watched directory minus our folders.
+     * Gets a stream newPath the walk newPath the watched directory minus our
+     * folders.
      *
      * @return The stream
      * @throws IOException If something went wrong
@@ -107,66 +96,79 @@ public enum SpaceBridge {
     }
 
     /**
+     * Checks whether or not the file exists in the space-bridge folder. NOTE:
+     * Only .opus files are allowed in the space-bridge folder.
+     *
+     * @param path The path newPath the file
+     * @return Whether or not the file exists in the space-bridge folder
+     */
+    private boolean fileDoesnExistInSpaceBridgeFolder(Path path) {
+        //Replace Possible Other Filenames, All Files are Just .opus in the Space-Bridge Directory
+        //Check to See If They Exist
+        String fileName = path.getFileName().toString().substring(0, path.getFileName().toString().lastIndexOf("."));
+        Path newPath = getCopyPath(Paths.get(path.getParent().toString(), fileName + ".opus"));
+        System.out.println("Space-Bridge Path: " + newPath);
+        System.out.println("Original: " + path);
+        System.out.println("Exists? " + Files.exists(newPath));
+
+        if (Files.notExists(newPath)) {
+            /*Path AWW = StellarUI.getFiles().get().get(0);
+            System.out.println("AWW Path: " + AWW);
+            System.out.println("AWW Exists? " + Files.exists(AWW));
+            System.out.println("Are Paths Equal? " + Files.isSameFile(newPath, AWW));*/
+            System.out.println("Why?");
+        }
+        return Files.notExists(getCopyPath(Paths.get(path.getParent().toString(), fileName + ".opus")));
+    }
+
+    /**
      * Initiates the conversion and watch processes
      *
      * @throws java.io.IOException If something happened
      */
     public void initBridge() throws IOException {
-        this.cartographer.log("\n\nAbout to Mirror Directories");
+        this.logger.log(Level.INFO, "\n\nAbout to Mirror Directories");
         //Mirror Directories
         fileWalkFilterUs().filter(path -> Files.isDirectory(path)).forEachOrdered(folder -> {
             try {
                 Path folderPath = getCopyPath(folder);
                 Files.createDirectories(folderPath);
-                this.cartographer.log("Created Folder: " + folderPath);
+                this.logger.log(Level.INFO, "Created Folder: " + folderPath + "\n");
             } catch (IOException ex) {
                 Logger.getLogger(SpaceBridge.class.getName()).log(Level.SEVERE, null, ex);
-                this.exceptionCartographer.logException("Init Bridge, Create Directories", ex);
+                this.logger.log(Level.SEVERE, "Init Bridge, Create Directories", ex);
                 throw new RuntimeException(ex);
             }
         });
         //Purge Non .opus files in the space-bridge directory
-        this.cartographer.log("About to scan for non .opus files");
+        this.logger.log(Level.INFO, "About to scan for non .opus files");
         Files.walk(this.completed, FileVisitOption.FOLLOW_LINKS).filter(path -> !Files.isDirectory(path)
                 && !path.getFileName().toString().contains(".opus")).forEach(path -> {
             FileUtils.deleteQuietly(path.toFile());
-            this.cartographer.log(path + " deleted");
+            this.logger.log(Level.INFO, "{0} deleted", path);
         });
-        this.cartographer.log("\n\nMirroring Process Complete");
-        this.cartographer.log("\n\nAbout to Mirror And Convert Files to 120K");
+        this.logger.log(Level.INFO, "\n\nMirroring Process Complete");
+        this.logger.log(Level.INFO, "\n\nAbout to Mirror And Convert Files to 120K");
         //Check if Converted Files Exist Already, if Not Convert Them
-        //No Directories, File Must be of expected file type, File Should Not Already Be Indexed
+        //No Directories, File Must be newPath expected file type, File Should Not Already Be Indexed
         fileWalkFilterUsNoDirectories().filter(path -> stringContains(path.getFileName().toString(), ".opus",
-                ".mp3", ".ogg")
-                //Replace Possible Other Filenames, all files are just .opus in the Space-Bridge Directory
-                && !Files.exists(getCopyPath(Paths.get(path.getParent().toString(), path.getFileName().toString()
-                        .replace("[.][^.]+$", ".opus")))))
+                ".mp3", ".ogg") && fileDoesnExistInSpaceBridgeFolder(path))
                 .forEachOrdered(file -> {
                     Future<Path> future = StellarHyperspace.getHyperspace().submit(() -> {
                         //Doesn't Exist in Destination, Convert to 120K
                         StellarOPUSConverter converter = new StellarOPUSConverter(file, getCopyPath(file).getParent());
                         Path path = converter.decreaseBitrate();
-                        this.cartographer.log("\nFile Convertion Complete: " + path);
+                        this.logger.log(Level.INFO, "\nFile Convertion Complete: " + path + "\n");
                         return path;
                     });
-                    StellarHyperspace.getSpaceBridge().submit(() -> {
-                        try {
-                            this.cartographer.log(future.get() + " Converted Succesfully!");
-                        } catch (InterruptedException | ExecutionException ex) {
-                            Logger.getLogger(SpaceBridge.class.getName()).log(Level.SEVERE, null, ex);
-                            this.exceptionCartographer.logException("Space-Bridge Logging Thread", ex);
-                        }
-                    });
-
                 });
-        this.cartographer.log("All Conversion Tasks Submitted to Hyperspace");
-        //Shut Down, then Await Termination of Hyperspace Task Executor
+        this.logger.log(Level.INFO, "All Conversion Tasks Submitted to Hyperspace");
+        //Shut Down, then Await Termination newPath Hyperspace Task Executor
         try {
             StellarHyperspace.initiateFalseVacuum();
-            StellarHyperspace.getHyperspace().awaitTermination(Long.MAX_VALUE, TimeUnit.DAYS);
         } catch (InterruptedException ex) {
-            Logger.getLogger(SpaceBridge.class.getName()).log(Level.SEVERE, null, ex);
+            throw new RuntimeException(ex);
         }
-        this.cartographer.log("Space-Bridge Conversions Complete!");
+        this.logger.log(Level.INFO, "Space-Bridge Conversions Complete!");
     }
 }

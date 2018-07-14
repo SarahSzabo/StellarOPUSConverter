@@ -5,16 +5,16 @@
  */
 package com.protonmail.sarahszabo.stellaropusconverter;
 
-import java.io.File;
+import com.protonmail.sarahszabo.stellaropusconverter.util.StellarGravitonField;
+import static com.protonmail.sarahszabo.stellaropusconverter.util.StellarGravitonField.*;
 import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
-import java.util.concurrent.ArrayBlockingQueue;
-import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
@@ -22,7 +22,6 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import javafx.application.Platform;
-import javafx.scene.input.Clipboard;
 
 /**
  * An interface representing the mode that the converter is in.
@@ -97,7 +96,7 @@ public enum StellarMode {
                     throw new RuntimeException(ex);
                 }
             }
-            System.out.println("\n\n Finished Files: " + text);
+            Logger.getLogger(StellarMode.class.getName()).info("\n\nFinished Files: " + text);
         }
     },
     /**
@@ -154,6 +153,8 @@ public enum StellarMode {
         }
     };
 
+    private static Logger logger = Logger.getLogger(StellarMode.class.getName());
+
     public abstract void start(String... args) throws IOException;
 
     /**
@@ -171,7 +172,7 @@ public enum StellarMode {
             }
         })
                 .collect(Collectors.joining("\n"));
-        System.out.println("\n\nCompleted Files:\n\n" + string);
+        Logger.getLogger(StellarMode.class.getName()).info("\n\nCompleted Files:\n\n" + string);
     }
 
     /**
@@ -180,7 +181,8 @@ public enum StellarMode {
      * @param paths The paths of the files to convert
      */
     private static void doMultipleConversion(Optional<List<Path>> paths) {
-        if (paths.isPresent()) {
+        //Check if path is not a directory & exists
+        if (paths.isPresent() && paths.get().stream().allMatch(path -> !Files.isDirectory(path) && Files.exists(path))) {
             //Sends the paths to Hyperspace and lists the completed file paths
             List<Path> finalPaths = StellarHyperspace.runConversionTasks(paths.get()).stream().map(future -> {
                 try {
@@ -190,8 +192,10 @@ public enum StellarMode {
                     throw new IllegalStateException("Stellar Mode Interrupted While Waiting for Futures", ex);
                 }
             }).collect(Collectors.toList());
-            System.out.println("\n\n\nCompleted Output Files:");
-            finalPaths.stream().forEach(System.out::println);
+            Logger.getLogger(StellarMode.class.getName()).info("\n\n\nCompleted Output Files:");
+            finalPaths.stream().forEach(path -> Logger.getLogger(StellarMode.class.getName()).info(path.toString()));
+        } else {
+            Logger.getLogger(StellarMode.class.getName()).info("All Paths Do Not Exist or Are Directories");
         }
         try {
             StellarHyperspace.initiateFalseVacuum();
@@ -202,6 +206,6 @@ public enum StellarMode {
     }
 
     private static void printIOExceptionMessage() {
-        System.err.println("We've encountered an I/O error. Check your disk capacity.");
+        Logger.getLogger(StellarMode.class.getName()).info("We've encountered an I/O error. Check your disk capacity.");
     }
 }
