@@ -9,7 +9,9 @@ import java.io.File;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
@@ -80,7 +82,7 @@ public enum StellarUI {
      *
      * @return The list containing the information
      */
-    public static List<String> askUserForArtistTitle() {
+    public static Map<StellarOPUSConverter.MetadataType, String> askUserForArtistTitle() {
         return askUserForArtistTitle("");
     }
 
@@ -92,7 +94,7 @@ public enum StellarUI {
      * @param fileName The file name to list on the dialog
      * @return The list containing the information
      */
-    public static List<String> askUserForArtistTitle(String fileName) {
+    public static Map<StellarOPUSConverter.MetadataType, String> askUserForArtistTitle(String fileName) {
         Platform.runLater(() -> {
             try {
                 TextInputDialog dialog = new TextInputDialog("");
@@ -124,9 +126,17 @@ public enum StellarUI {
         } catch (InterruptedException ex) {
             Logger.getLogger(StellarUI.class.getName()).log(Level.SEVERE, null, ex);
             System.out.println("Interrupted while waiting for user input!");
-            list.addAll(StellarOPUSConverter.getDefaultMetadataList());
+            Map<StellarOPUSConverter.MetadataType, String> map = StellarOPUSConverter.getDefaultMetadata();
+            list.add(map.get(StellarOPUSConverter.MetadataType.ARTIST));
+            list.add(map.get(StellarOPUSConverter.MetadataType.TITLE));
         }
-        return list.stream().map(string -> string.trim()).collect(Collectors.toList());
+        //Format Nicely
+        List<String> newList = list.stream().map(string -> string.trim()).collect(Collectors.toList());
+        //Convert to Map
+        Map<StellarOPUSConverter.MetadataType, String> map = new HashMap<>(2);
+        map.put(StellarOPUSConverter.MetadataType.ARTIST, newList.get(0));
+        map.put(StellarOPUSConverter.MetadataType.TITLE, newList.get(1));
+        return map;
     }
 
     /**

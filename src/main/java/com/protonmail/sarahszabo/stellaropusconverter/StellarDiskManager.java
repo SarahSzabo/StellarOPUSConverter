@@ -11,15 +11,19 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.exc.InvalidDefinitionException;
 import com.fasterxml.jackson.databind.exc.UnrecognizedPropertyException;
+import com.protonmail.sarahszabo.stellaropusconverter.util.StellarGravitonField;
 import com.protonmail.sarahszabo.stellaropusconverter.util.StellarLoggingFormatter;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
+import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.stream.Collectors;
 import org.apache.commons.io.FileUtils;
 
 /**
@@ -58,6 +62,43 @@ public enum StellarDiskManager {
     public static final ObjectMapper mapper = new ObjectMapper();
 
     private static final Logger logger = StellarLoggingFormatter.forClass(StellarDiskManager.class);
+
+    /**
+     * Gets a list of metadata from an already existing .opus file on the disk.
+     *
+     * @param path The path of the opus file
+     * @return The metadata of the opus file
+     */
+    public static Map<StellarOPUSConverter.MetadataType, String> getOPUSMetadata(Path path) throws IOException {
+        //TODO Fix picture reading
+        Path metadataPath = StellarGravitonField.newPath(getTempDirectory(),
+                StellarOPUSConverter.FileExtension.stripFileExtension(path) + ".txt");
+        //Crreate Metadata file
+        ProcessBuilder builder = StellarGravitonField.processOPBuilder(true, "exiftool", path.toAbsolutePath().toString(), ">",
+                metadataPath.toString());
+        //Trim Entries from exiftool
+        List<String> lines = Files.readAllLines(metadataPath).stream().map(str -> str.trim()).collect(Collectors.toList());
+        Map<StellarOPUSConverter.MetadataType, String> metadata = StellarOPUSConverter.getDefaultMetadata();
+        for (String str : lines) {
+            if (str.contains("Artist")) {
+                //Data is always after the : character
+                String artist = str.split(":")[1];
+                //Map Behaviour overwrites existing entry
+                metadata.put(StellarOPUSConverter.MetadataType.ARTIST, artist);
+            } else if (str.contains("Title")) {
+                //Data is always after the : character
+                String title = str.split(":")[1];
+                //Map Behaviour overwrites existing entry
+                metadata.put(StellarOPUSConverter.MetadataType.TITLE, title);
+            } else if (str.contains("Picture")) {
+                //Data is always after the : character
+                String pictureData = str.split(":")[1];
+                //Map Behaviour overwrites existing entry
+                metadata.put(StellarOPUSConverter.MetadataType.ALBUM_ART, pictureData);
+            }
+        }
+        return metadata;
+    }
 
     /**
      * Gets the help text from the help text file.

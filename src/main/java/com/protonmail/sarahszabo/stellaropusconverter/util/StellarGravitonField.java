@@ -5,14 +5,18 @@
  */
 package com.protonmail.sarahszabo.stellaropusconverter.util;
 
+import com.protonmail.sarahszabo.stellaropusconverter.StellarDiskManager;
+import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeFormatterBuilder;
 import java.time.temporal.ChronoField;
+import java.util.List;
 import java.util.function.Function;
 import java.util.logging.Handler;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -35,6 +39,69 @@ public class StellarGravitonField {
             .appendLiteral(".").appendValue(ChronoField.MILLI_OF_SECOND).toFormatter();
 
     private static final Logger logger = Logger.getLogger(StellarGravitonField.class.getName());
+
+    /**
+     * /**
+     * Launches a new process in the temp directory, and waits for its
+     * completion.
+     *
+     * @param commands The commands to execute
+     * @throws IOException InterruptedException If something went wrong
+     */
+    public static void processOP(List<String> commands, boolean inheritIO) throws IOException {
+        processOP(inheritIO, commands.toArray(new String[4]));
+    }
+
+    /**
+     * Launches a new process in the temp directory, and waits for its
+     * completion. Does not inherit IO.
+     *
+     * @param commands The commands to execute
+     * @throws IOException InterruptedException If something went wrong
+     */
+    public static void processOP(String... commands) throws IOException {
+        processOP(false, commands);
+    }
+
+    /**
+     * Launches a new process in the temp directory, and waits for its
+     * completion.
+     *
+     * @param inheritIO Should the streams be merged
+     * @param commands The commands to execute
+     * @throws IOException InterruptedException If something went wrong
+     */
+    public static void processOP(boolean inheritIO, String... commands) throws IOException {
+        /*//Print out FFMPEG Command
+        String s = "";
+        for (String st : new ProcessBuilder(commands)
+                .directory(StellarDiskManager.getTempDirectory().toFile()).inheritIO().command()) {
+            s += " " + st;
+        }
+        enterLog("COMMAND: " + s);*/
+        //Actually do it
+        Process proc = processOPBuilder(inheritIO, commands).start();
+        try {
+            proc.waitFor();
+        } catch (InterruptedException ex) {
+            Logger.getLogger(StellarGravitonField.class.getName()).log(Level.SEVERE, null, ex);
+        }
+    }
+
+    /**
+     * Gets the process builder with the specified boolean indicating whether IO
+     * should be inherited or not, and the commands to execute. This process
+     * builder is localized at the temp directory.
+     *
+     * @param inheritIO If IO should be inherited
+     * @param commands The commands to execute
+     * @return The process builder with these properties
+     */
+    public static ProcessBuilder processOPBuilder(boolean inheritIO, String... commands) {
+        return inheritIO ? new ProcessBuilder(commands)
+                .directory(StellarDiskManager.getTempDirectory().toFile()).inheritIO()
+                : new ProcessBuilder(commands).directory(StellarDiskManager.getTempDirectory().toFile());
+    }
 
     /**
      * Helper method, prints the message then System.exit().

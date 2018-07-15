@@ -31,7 +31,6 @@ public enum SpaceBridge {
      */
     SPACE_BRIDGE;
 
-    private final StellarDiskManager diskManager = StellarDiskManager.DISKMANAGER;
     private final Path watching, completed, logFolder, logFile;
     private final Logger logger = StellarLoggingFormatter.forClass(SpaceBridge.class);
 
@@ -40,7 +39,7 @@ public enum SpaceBridge {
      */
     private SpaceBridge() {
         try {
-            StellarDiskManager.DiskManagerState state = this.diskManager.getState();
+            StellarDiskManager.DiskManagerState state = StellarDiskManager.getState();
             //The directory we're watching
             this.watching = state.getSpaceBridgeDirectory();
             //Our completed files go here
@@ -107,17 +106,9 @@ public enum SpaceBridge {
         //Check to See If They Exist
         String fileName = path.getFileName().toString().substring(0, path.getFileName().toString().lastIndexOf("."));
         Path newPath = getCopyPath(Paths.get(path.getParent().toString(), fileName + ".opus"));
-        System.out.println("Space-Bridge Path: " + newPath);
-        System.out.println("Original: " + path);
-        System.out.println("Exists? " + Files.exists(newPath));
-
-        if (Files.notExists(newPath)) {
-            /*Path AWW = StellarUI.getFiles().get().get(0);
-            System.out.println("AWW Path: " + AWW);
-            System.out.println("AWW Exists? " + Files.exists(AWW));
-            System.out.println("Are Paths Equal? " + Files.isSameFile(newPath, AWW));*/
-            System.out.println("Why?");
-        }
+        logger.fine("Space-Bridge Path: " + newPath);
+        logger.fine("Original: " + path);
+        logger.fine("Exists? " + Files.exists(newPath));
         return Files.notExists(getCopyPath(Paths.get(path.getParent().toString(), fileName + ".opus")));
     }
 

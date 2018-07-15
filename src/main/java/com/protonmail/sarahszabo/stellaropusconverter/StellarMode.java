@@ -5,8 +5,6 @@
  */
 package com.protonmail.sarahszabo.stellaropusconverter;
 
-import com.protonmail.sarahszabo.stellaropusconverter.util.StellarGravitonField;
-import static com.protonmail.sarahszabo.stellaropusconverter.util.StellarGravitonField.*;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -148,7 +146,7 @@ public enum StellarMode {
         private Callable<Path> toTaskFormat(Path filePath, String artist) {
             return () -> {
                 StellarOPUSConverter converter = new StellarOPUSConverter(filePath);
-                return converter.convertToOPUS(artist, StellarOPUSConverter.stripFileExtension(filePath));
+                return converter.convertToOPUS(artist, StellarOPUSConverter.FileExtension.stripFileExtension(filePath));
             };
         }
     };
