@@ -26,11 +26,25 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 /**
- * A converter that converts files to the OPUS format.
+ * A converter that converts files to the OPUS format. NOTE: Requires these
+ * libraries to use successfully: *Buntu OS Terminal Libraries ">" to file
+ * operator, exiftool, ffmpeg.
  *
  * @author Sarah Szabo <PhysicistSarah@Gmail.com>
  */
 public class StellarOPUSConverter {
+
+    /**
+     * Gets the filename format for the image conversion process. The metadata
+     * must be set before calling this method.
+     *
+     * @param metadata The metadata list to generate the filename from
+     * @return The filename with .png extension
+     */
+    public static String getImageFileName(Map<StellarOPUSConverter.MetadataType, String> metadata) {
+        return preferredTitleFormat(metadata.get(MetadataType.ARTIST)) + " -- "
+                + preferredTitleFormat(metadata.get(MetadataType.TITLE)) + ".png";
+    }
 
     /**
      * Gets the default metadata list.
@@ -45,7 +59,7 @@ public class StellarOPUSConverter {
         return metadata;
     }
 
-    private final String fileNameNoEXT, trueFileName;
+    private final String fileNameNoEXT, opusFileName, properFileNameNoEXT;
     private final Path filePath, outputFolder;
     private final Map<MetadataType, String> metadata;
     private final FileExtension fileExtension;
@@ -81,7 +95,8 @@ public class StellarOPUSConverter {
         } else {
             this.fileExtension = dummyExtension;
         }
-        this.trueFileName = preferredTitleFormat(this.fileNameNoEXT + ".opus");
+        this.opusFileName = preferredTitleFormat(this.fileNameNoEXT + ".opus");
+        this.properFileNameNoEXT = preferredTitleFormat(this.fileNameNoEXT);
         this.metadata = new HashMap<>(3);
     }
 
@@ -105,35 +120,64 @@ public class StellarOPUSConverter {
      * @throws java.io.IOException If something happened
      */
     public StellarOPUSConverter(Path filePath) throws IOException {
-        this(filePath, StellarDiskManager.getTempDirectory());
+        this(filePath, StellarDiskManager.getOutputFolder());
     }
 
     /**
      * Re indexes an OPUS file, applying modern standards to older versions of
-     * .opus files. Uses 320K by default
+     * .opus files. Uses 320K by default. The .opus file must exist already to
+     * use this subroutine.
      */
     public void reIndexOPUSFile() throws IOException {
         reIndexOPUSFile(320);
     }
 
     /**
+     * Checks that the .opus file exists or throws an exception.
+     */
+    private void checkFileExists() {
+        if (!Files.exists(this.filePath)) {
+            throw new IllegalStateException("You're using a subroutine that requires that the .opus file exists already,"
+                    + " but you're called it at a time when it doesn't!");
+        }
+    }
+
+    /**
      * Re indexes an OPUS file, applying modern standards to older versions of
-     * .opus files. Has a parameter for bitrate, ex: 320 -> 320K.
+     * .opus files. Has a parameter for bitrate, ex: 320 -> 320K. The .opus file
+     * must exist already to use this subroutine.
      *
      * @param bitrate The bitrate in K
      * @throws java.io.IOException If something went wrong
      */
     public void reIndexOPUSFile(int bitrate) throws IOException {
-        Path tempFilePath = newPath(StellarDiskManager.getTempDirectory(), FileExtension.stripFileExtension(this.filePath));
-        Files.copy(this.filePath, tempFilePath);
+        checkFileExists();
+        Path tempFilePath = StellarDiskManager.copyToTemp(this.filePath);
         Map<MetadataType, String> metadata = StellarDiskManager.getOPUSMetadata(this.filePath);
         this.metadata.putAll(metadata);
-        //Convert to FLAC
+        //Convert to FLAC intermediate, opusenc only converts other formats, also FLAC is lossess, so should be OK as far as quality is concerned.
         String flacFileName = FileExtension.stripFileExtension(tempFilePath) + ".flac";
         processOP("ffmpeg", "-i", tempFilePath.getFileName().toString(), flacFileName);
         //Convert Back to .opus
-        processOP("opusenc", flacFileName, FileExtension.stripFileExtension(tempFilePath) + ".opus",
-                "--bitrate", bitrate + "k", "--title", metadata.get(MetadataType.TITLE), "--artist", metadata.get(MetadataType.ARTIST));
+        //Is the picture metadata aready set?
+        if (!metadata.get(MetadataType.ALBUM_ART).equalsIgnoreCase(getDefaultMetadata().get(MetadataType.ALBUM_ART))) {
+            //We have the picture metadata
+            processOP("opusenc", flacFileName, FileExtension.stripFileExtension(tempFilePath) + ".opus",
+                    "--bitrate", bitrate + "k", "--title", metadata.get(MetadataType.TITLE), "--artist", metadata.get(MetadataType.ARTIST),
+                    "--picture", metadata.get(MetadataType.ALBUM_ART));
+        } else {
+            //We have to set the picture ourselves, get it from the picture output folder
+            Path picturePath = newPath(StellarDiskManager.getPictureOutputFolder(), getImageFileName()).toAbsolutePath();
+            if (!Files.exists(picturePath)) {
+                //Bad, the picture doesn't exist, ask the user for it
+                picturePath = StellarUI.getFile("Select a .JPEG or .PNG file").orElseThrow(()
+                        -> new IllegalStateException("Setting New Picture Aborted"));
+            }
+            //Set the picture & bitrate
+            processOP("opusenc", flacFileName, FileExtension.stripFileExtension(tempFilePath) + ".opus",
+                    "--bitrate", bitrate + "k", "--title", metadata.get(MetadataType.TITLE), "--artist", metadata.get(MetadataType.ARTIST),
+                    "--picture", picturePath.toString());
+        }
     }
 
     /**
@@ -201,6 +245,8 @@ public class StellarOPUSConverter {
                 this.logger.log(Level.SEVERE, "Error encountered during conversion", ex);
             }
         });
+        //Reindex to Save Album Art
+        reIndexOPUSFile(bitrate);
         //Clear Metadata to Restore Default State for next use
         this.metadata.clear();
         return Paths.get(StellarDiskManager.getOutputFolder().toString(), title + ".opus");
@@ -212,11 +258,13 @@ public class StellarOPUSConverter {
      * {@link StellarDiskManager#getOutputFolder()}. If not an .opus file,
      * converts to .opus, may not faithfully capture artist/title using this
      * method. Does not attempt to adjust filename using this conversion method.
+     * The .opus file must exist already to use this subroutine.
      *
      * @return The path to the converted file
      * @throws java.io.IOException If something happened
      */
     public Path decreaseBitrate() throws IOException {
+        checkFileExists();
         this.metadata.put(MetadataType.ARTIST, "Unknown Artist");
         this.metadata.put(MetadataType.TITLE, this.filePath.getFileName().toString().replace(this.fileExtension.toString(), ""));
         copyOPSameFileName(() -> {
@@ -319,6 +367,8 @@ public class StellarOPUSConverter {
                 Logger.getLogger(StellarOPUSConverter.class.getName()).log(Level.SEVERE, null, ex);
             }
         });
+        //Reindex to Save Album Art
+        reIndexOPUSFile();
         //Clear Metadata to Restore to Default State
         this.metadata.clear();
         return Paths.get(StellarDiskManager.getOutputFolder().toString(), title + ".opus");
@@ -411,7 +461,7 @@ public class StellarOPUSConverter {
                 Files.move(originalFileNamePath, newPath(this.outputFolder, originalFileNamePath.getFileName()));
             } else {
                 //Just Move the .opus File
-                Files.move(copyDummyPath, newPath(this.outputFolder, trueFileName), StandardCopyOption.REPLACE_EXISTING);
+                Files.move(copyDummyPath, newPath(this.outputFolder, opusFileName), StandardCopyOption.REPLACE_EXISTING);
             }
         } catch (IOException ex) {
             this.logger.log(Level.SEVERE, "copyOP -> Move Section", ex);
@@ -436,7 +486,7 @@ public class StellarOPUSConverter {
      * Gets the filename format for the image conversion process. The metadata
      * must be set before calling this method.
      *
-     * @return The filename
+     * @return The filename with .png extension
      */
     private String getImageFileName() {
         return preferredTitleFormat(this.metadata.get(MetadataType.ARTIST)) + " -- "
@@ -457,15 +507,8 @@ public class StellarOPUSConverter {
             processOP("ffmpeg", "-ss", "30", "-i", this.filePath.getFileName().toString(), "-y", "-qscale:v", "2",
                     "-frames:v", "1", "-huffman", "optimal", getImageFileName());
             //Copy Image to Picture Output Folder
-            //Files.copy(newPath(StellarDiskManager.getTempDirectory(), getImageFileName()),
-            //      newPath(StellarDiskManager.getPictureOutputFolder(), getImageFileName()));
-            //Assign Picture to File
-            //TODO: Disable in Testing Environment
-            ProcessBuilder builder = processOPBuilder(false, "kid3-cli");
-            builder.redirectOutput(ProcessBuilder.Redirect.INHERIT);
-            Process process = builder.start();
-            process.getInputStream().read("pwd\n".getBytes());
-            System.exit(0);
+            Files.copy(newPath(StellarDiskManager.getTempDirectory(), getImageFileName()),
+                    newPath(StellarDiskManager.getPictureOutputFolder(), getImageFileName()));
         }
     }
 
@@ -572,7 +615,7 @@ public class StellarOPUSConverter {
          * @return The list newPath commands needing execution
          */
         public List<String> getLowBitrateConversion(Path inputFile) {
-            return new ProcessBuilder("ffmpeg", "-i", inputFile.getFileName().toString(), "-b:a", "120k", "-strict",
+            return new ProcessBuilder("ffmpeg", "-i", inputFile.getFileName().toString(), "-b:a", "160k", "-strict",
                     "-2", preferredTitleFormat(inputFile.getFileName().toString().replace(toString(), "") + "(((Copy))).opus")).command();
         }
 

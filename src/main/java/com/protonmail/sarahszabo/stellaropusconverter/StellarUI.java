@@ -36,8 +36,8 @@ import org.controlsfx.control.Notifications;
  */
 public enum StellarUI {
     ;
-    private static final BlockingQueue<List<File>> PATHS_QUEUE = new ArrayBlockingQueue<>(1);
-    private static final BlockingQueue<File> OUTPUT_FOLDER_QUEUE = new ArrayBlockingQueue<>(1);
+    private static final BlockingQueue<List<File>> FILE_LIST_QUEUE = new ArrayBlockingQueue<>(1);
+    private static final BlockingQueue<File> FILE_QUEUE = new ArrayBlockingQueue<>(1);
     private static final BlockingQueue<Optional<String>> ASK_USER_METADATA = new ArrayBlockingQueue<>(1);
 
     static {
@@ -98,7 +98,7 @@ public enum StellarUI {
         Platform.runLater(() -> {
             try {
                 TextInputDialog dialog = new TextInputDialog("");
-                dialog.setTitle("Stellar OPUS Converter: Enter Artist/Track Title");
+                dialog.setTitle("Stellar: Enter Artist/Track Title");
                 dialog.setHeaderText((fileName != null ? ("(" + fileName + ")\n") : "")
                         + "Enter Author/Track Title Like So: Author, Title");
                 dialog.getDialogPane().setMinSize(Region.USE_PREF_SIZE, Region.USE_PREF_SIZE);
@@ -140,6 +140,34 @@ public enum StellarUI {
     }
 
     /**
+     * Gets a file from the disk.
+     *
+     * @param label The label to use for the chooser
+     * @return The path to the file on the disk
+     */
+    public static Optional<Path> getFile(String label) {
+        Platform.runLater(() -> {
+            FileChooser chooser = new FileChooser();
+            chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("OPUS Files", "*.opus"));
+            chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("Picture Files", "*.jpeg", "*.png"));
+            chooser.setTitle("Stellar: " + label);
+            File file = chooser.showOpenDialog(null);
+            try {
+                FILE_QUEUE.put(file);
+            } catch (InterruptedException ex) {
+                Logger.getLogger(StellarUI.class.getName()).log(Level.SEVERE, null, ex);
+            }
+        });
+        try {
+            File file = FILE_QUEUE.take();
+            return Optional.of(file.toPath().toAbsolutePath());
+        } catch (InterruptedException ex) {
+            Logger.getLogger(StellarUI.class.getName()).log(Level.SEVERE, null, ex);
+            throw new RuntimeException(ex);
+        }
+    }
+
+    /**
      * Gets the output folder location.
      *
      * @param type The String type of object to set as the label Ex: Converted
@@ -147,18 +175,18 @@ public enum StellarUI {
      * @return The folder path
      */
     public static Optional<Path> getFolderFor(String type) {
-        DirectoryChooser chooser = new DirectoryChooser();
-        chooser.setTitle("Stellar OPUS Converter: Choose Directory for " + type);
         Platform.runLater(() -> {
+            DirectoryChooser chooser = new DirectoryChooser();
+            chooser.setTitle("Stellar: Choose Directory for " + type);
             File file = chooser.showDialog(null);
             try {
-                OUTPUT_FOLDER_QUEUE.put(file);
+                FILE_QUEUE.put(file);
             } catch (InterruptedException ex) {
                 Logger.getLogger(StellarUI.class.getName()).log(Level.SEVERE, null, ex);
             }
         });
         try {
-            return Optional.of(OUTPUT_FOLDER_QUEUE.take().toPath());
+            return Optional.of(FILE_QUEUE.take().toPath());
         } catch (InterruptedException ex) {
             System.err.println("Interrupted during waiting for output file list!");
         }
@@ -172,7 +200,7 @@ public enum StellarUI {
      */
     public static Optional<List<Path>> getFiles() {
         FileChooser chooser = new FileChooser();
-        chooser.setTitle("Stellar OPUS Converter: Choose Files to Convert to OPUS");
+        chooser.setTitle("Stellar: Choose Files to Convert to OPUS");
         chooser.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("All Formats", "*.*"));
         FileChooser.ExtensionFilter videoFilter = new FileChooser.ExtensionFilter("All Video Files (.mp4, .mkv)", "*.mp4", "*.mkv");
         chooser.getExtensionFilters().add(videoFilter);
@@ -184,13 +212,13 @@ public enum StellarUI {
                     System.out.println("No Files Chosen, Aborting");
                     System.exit(0);
                 }
-                PATHS_QUEUE.put(files);
+                FILE_LIST_QUEUE.put(files);
             } catch (InterruptedException ex) {
                 Logger.getLogger(StellarUI.class.getName()).log(Level.SEVERE, null, ex);
             }
         });
         try {
-            List<File> files = PATHS_QUEUE.take();
+            List<File> files = FILE_LIST_QUEUE.take();
             if (files != null) {
                 return Optional.of(files.stream().map(file -> file.toPath()).collect(Collectors.toList()));
             }

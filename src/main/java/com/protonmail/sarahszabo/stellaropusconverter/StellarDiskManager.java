@@ -12,6 +12,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.exc.InvalidDefinitionException;
 import com.fasterxml.jackson.databind.exc.UnrecognizedPropertyException;
 import com.protonmail.sarahszabo.stellaropusconverter.util.StellarGravitonField;
+import static com.protonmail.sarahszabo.stellaropusconverter.util.StellarGravitonField.*;
 import com.protonmail.sarahszabo.stellaropusconverter.util.StellarLoggingFormatter;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -64,20 +65,33 @@ public enum StellarDiskManager {
     private static final Logger logger = StellarLoggingFormatter.forClass(StellarDiskManager.class);
 
     /**
+     * Generates the album art image from the opus file, and puts it in the
+     * output folder.
+     *
+     * @param path The path of the .opus file
+     * @param partialMetadata The partial (Only artist/title) metadata
+     * @return The picture file generated
+     */
+    private static Path generateImagefromOPUSFile(Path path, Map<StellarOPUSConverter.MetadataType, String> partialMetadata) throws IOException {
+        String noExtension = StellarOPUSConverter.FileExtension.stripFileExtension(path);
+        String fileName = StellarOPUSConverter.getImageFileName(partialMetadata);
+        processOP("exiftool", "-Picture", "-b", noExtension + ".opus", ">", fileName);
+        return StellarDiskManager.copyFromTemp(fileName);
+    }
+
+    /**
      * Gets a list of metadata from an already existing .opus file on the disk.
      *
      * @param path The path of the opus file
      * @return The metadata of the opus file
      */
     public static Map<StellarOPUSConverter.MetadataType, String> getOPUSMetadata(Path path) throws IOException {
-        //TODO Fix picture reading
-        Path metadataPath = StellarGravitonField.newPath(getTempDirectory(),
+        Path metadataFilePath = StellarGravitonField.newPath(getTempDirectory(),
                 StellarOPUSConverter.FileExtension.stripFileExtension(path) + ".txt");
-        //Crreate Metadata file
-        ProcessBuilder builder = StellarGravitonField.processOPBuilder(true, "exiftool", path.toAbsolutePath().toString(), ">",
-                metadataPath.toString());
+        //Create Metadata file
+        processOP("exiftool", path.toAbsolutePath().toString(), ">", metadataFilePath.toString());
         //Trim Entries from exiftool
-        List<String> lines = Files.readAllLines(metadataPath).stream().map(str -> str.trim()).collect(Collectors.toList());
+        List<String> lines = Files.readAllLines(metadataFilePath).stream().map(str -> str.trim()).collect(Collectors.toList());
         Map<StellarOPUSConverter.MetadataType, String> metadata = StellarOPUSConverter.getDefaultMetadata();
         for (String str : lines) {
             if (str.contains("Artist")) {
@@ -90,12 +104,18 @@ public enum StellarDiskManager {
                 String title = str.split(":")[1];
                 //Map Behaviour overwrites existing entry
                 metadata.put(StellarOPUSConverter.MetadataType.TITLE, title);
-            } else if (str.contains("Picture")) {
-                //Data is always after the : character
-                String pictureData = str.split(":")[1];
-                //Map Behaviour overwrites existing entry
-                metadata.put(StellarOPUSConverter.MetadataType.ALBUM_ART, pictureData);
             }
+        }
+        //Atempt Picture Reconstruction
+        Path picturePath = generateImagefromOPUSFile(path, metadata);
+        //If the picture file is less than 100 bytes, there was no image data in teh.opus file, we'll have to ask the user for it
+        if (Files.size(picturePath) < 100) {
+            //Put default metadata into metadata map
+            metadata.put(StellarOPUSConverter.MetadataType.ALBUM_ART,
+                    StellarOPUSConverter.getDefaultMetadata().get(StellarOPUSConverter.MetadataType.ALBUM_ART));
+        } else {
+            //Get Picture File Path & Insert into Map
+            metadata.put(StellarOPUSConverter.MetadataType.ALBUM_ART, picturePath.toAbsolutePath().toString());
         }
         return metadata;
     }
@@ -210,24 +230,28 @@ public enum StellarDiskManager {
      * Copies a file to the temporary directory from the specified directory.
      *
      * @param filePath The file to copy
+     * @return The file location after it has been copied over
      * @throws IOException If something happened
      */
-    public static void copyToTemp(Path filePath) throws IOException {
-        logger.info(tempDirectory.toString());
-        Files.copy(filePath, Paths.get(tempDirectory.toString(), filePath.getFileName().toString()),
-                StandardCopyOption.REPLACE_EXISTING);
+    public static Path copyToTemp(Path filePath) throws IOException {
+        Path destination = StellarGravitonField.newPath(tempDirectory, filePath.getFileName());
+        logger.fine(tempDirectory.toString());
+        Files.copy(filePath, destination, StandardCopyOption.REPLACE_EXISTING);
+        return destination;
     }
 
     /**
      * Copies the selected file from the temp directory to the output folder.
      *
      * @param fileName The filename to move
+     * @return The path to the file after it has been copied
      * @throws IOException If something went wrong
      */
-    public static void copyFromTemp(String fileName) throws IOException {
+    public static Path copyFromTemp(String fileName) throws IOException {
         logger.info("\n\nFile Copy Exists in Temp Folder: " + Files.exists(Paths.get(tempDirectory.toString(), fileName)));
-        Files.copy(Paths.get(tempDirectory.toString(), fileName),
-                Paths.get(outputFolder.toString(), fileName), StandardCopyOption.REPLACE_EXISTING);
+        Path destination = Paths.get(outputFolder.toString(), fileName);
+        Files.copy(Paths.get(tempDirectory.toString(), fileName), destination, StandardCopyOption.REPLACE_EXISTING);
+        return destination;
     }
 
     /**
