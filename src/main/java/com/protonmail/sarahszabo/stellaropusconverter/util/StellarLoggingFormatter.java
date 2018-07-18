@@ -7,6 +7,8 @@ package com.protonmail.sarahszabo.stellaropusconverter.util;
 
 import java.util.logging.ConsoleHandler;
 import java.util.logging.Formatter;
+import java.util.logging.Handler;
+import java.util.logging.Level;
 import java.util.logging.LogRecord;
 import java.util.logging.Logger;
 
@@ -26,7 +28,9 @@ public class StellarLoggingFormatter extends Formatter {
      */
     public static Logger forClass(Class<?> clazz) {
         Logger logger = Logger.getLogger(clazz.getName());
-        StellarGravitonField.toTypicalLoggerFormat(logger, new ConsoleHandler());
+        Handler handler = new ConsoleHandler();
+        handler.setLevel(Level.ALL);
+        StellarGravitonField.toTypicalLoggerFormat(logger, handler);
         return logger;
     }
 

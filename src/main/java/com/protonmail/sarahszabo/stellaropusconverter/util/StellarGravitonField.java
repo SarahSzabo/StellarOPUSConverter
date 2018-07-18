@@ -46,6 +46,7 @@ public class StellarGravitonField {
      * completion.
      *
      * @param commands The commands to execute
+     * @param inheritIO Merge the process streams?
      * @throws IOException InterruptedException If something went wrong
      */
     public static void processOP(List<String> commands, boolean inheritIO) throws IOException {
@@ -68,24 +69,63 @@ public class StellarGravitonField {
      * completion.
      *
      * @param inheritIO Should the streams be merged
+     * @param redirect The path to direct output from the process to, if null,
+     * prints to terminal
      * @param commands The commands to execute
      * @throws IOException InterruptedException If something went wrong
      */
-    public static void processOP(boolean inheritIO, String... commands) throws IOException {
-        /*//Print out FFMPEG Command
+    public static void processOP(boolean inheritIO, Path redirect, String... commands) throws IOException {
+        //Print out FFMPEG Command
         String s = "";
-        for (String st : new ProcessBuilder(commands)
-                .directory(StellarDiskManager.getTempDirectory().toFile()).inheritIO().command()) {
+        for (String st : processOPBuilder(true, redirect, commands).command()) {
             s += " " + st;
         }
-        enterLog("COMMAND: " + s);*/
+        logger.info("COMMAND: " + s);
         //Actually do it
-        Process proc = processOPBuilder(inheritIO, commands).start();
+        Process proc = processOPBuilder(inheritIO, redirect, commands).start();
         try {
             proc.waitFor();
         } catch (InterruptedException ex) {
             Logger.getLogger(StellarGravitonField.class.getName()).log(Level.SEVERE, null, ex);
         }
+    }
+
+    /**
+     * Launches a new process in the temp directory, and waits for its
+     * completion.
+     *
+     * @param inheritIO Should the streams be merged
+     * @param commands The commands to execute
+     * @throws IOException InterruptedException If something went wrong
+     */
+    public static void processOP(boolean inheritIO, String... commands) throws IOException {
+        processOP(inheritIO, null, commands);
+    }
+
+    /**
+     * Gets the process builder with the specified boolean indicating whether IO
+     * should be inherited or not, and the commands to execute. This process
+     * builder is localised at the temp directory.
+     *
+     * @param inheritIO If IO should be inherited
+     * @param redirect The path to direct output from the process to, if null,
+     * prints to terminal
+     * @param commands The commands to execute
+     * @return The process builder with these properties
+     */
+    public static ProcessBuilder processOPBuilder(boolean inheritIO, Path redirect, String... commands) {
+        ProcessBuilder builder;
+        if (inheritIO) {
+            builder = new ProcessBuilder(commands)
+                    .directory(StellarDiskManager.getTempDirectory().toFile()).inheritIO();
+
+        } else {
+            builder = new ProcessBuilder(commands).directory(StellarDiskManager.getTempDirectory().toFile());
+        }
+        if (redirect != null) {
+            builder = builder.redirectOutput(redirect.toFile());
+        }
+        return builder;
     }
 
     /**

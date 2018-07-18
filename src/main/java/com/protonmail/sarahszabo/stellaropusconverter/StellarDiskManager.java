@@ -66,17 +66,18 @@ public enum StellarDiskManager {
 
     /**
      * Generates the album art image from the opus file, and puts it in the
-     * output folder.
+     * output folder. NOTE: The .dat file may be 0 Bytes if there was no image
+     * file in the .opus file. This file contains binary image information.
      *
-     * @param path The path of the .opus file
+     * @param path The path of the .dat file
      * @param partialMetadata The partial (Only artist/title) metadata
      * @return The picture file generated
      */
     private static Path generateImagefromOPUSFile(Path path, Map<StellarOPUSConverter.MetadataType, String> partialMetadata) throws IOException {
         String noExtension = StellarOPUSConverter.FileExtension.stripFileExtension(path);
-        String fileName = StellarOPUSConverter.getImageFileName(partialMetadata);
-        processOP("exiftool", "-Picture", "-b", noExtension + ".opus", ">", fileName);
-        return StellarDiskManager.copyFromTemp(fileName);
+        Path imageDataPath = newPath(tempDirectory, noExtension + ".dat");
+        processOP(true, tempDirectory, "exiftool", "-Picture", "-b", noExtension + ".opus");
+        return imageDataPath;
     }
 
     /**
@@ -84,14 +85,16 @@ public enum StellarDiskManager {
      *
      * @param path The path of the opus file
      * @return The metadata of the opus file
+     * @throws java.io.IOException If something went wrong
      */
     public static Map<StellarOPUSConverter.MetadataType, String> getOPUSMetadata(Path path) throws IOException {
         Path metadataFilePath = StellarGravitonField.newPath(getTempDirectory(),
                 StellarOPUSConverter.FileExtension.stripFileExtension(path) + ".txt");
         //Create Metadata file
-        processOP("exiftool", path.toAbsolutePath().toString(), ">", metadataFilePath.toString());
+        processOP(true, tempDirectory, "exiftool", path.getFileName().toString());
         //Trim Entries from exiftool
-        List<String> lines = Files.readAllLines(metadataFilePath).stream().map(str -> str.trim()).collect(Collectors.toList());
+        List<String> lines = Files.readAllLines(metadataFilePath).stream().map(str -> str.trim().replaceAll("\u0020", ""))
+                .collect(Collectors.toList());
         Map<StellarOPUSConverter.MetadataType, String> metadata = StellarOPUSConverter.getDefaultMetadata();
         for (String str : lines) {
             if (str.contains("Artist")) {
@@ -248,7 +251,6 @@ public enum StellarDiskManager {
      * @throws IOException If something went wrong
      */
     public static Path copyFromTemp(String fileName) throws IOException {
-        logger.info("\n\nFile Copy Exists in Temp Folder: " + Files.exists(Paths.get(tempDirectory.toString(), fileName)));
         Path destination = Paths.get(outputFolder.toString(), fileName);
         Files.copy(Paths.get(tempDirectory.toString(), fileName), destination, StandardCopyOption.REPLACE_EXISTING);
         return destination;
