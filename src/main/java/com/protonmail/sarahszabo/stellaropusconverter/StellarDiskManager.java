@@ -22,6 +22,7 @@ import java.nio.file.StandardCopyOption;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Random;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
@@ -39,9 +40,13 @@ public enum StellarDiskManager {
      */
     DISKMANAGER;
     /**
+     * The user directory.
+     */
+    public static final Path USER_DIR = Paths.get(System.getProperty("user.dir"));
+    /**
      * The configuration folder
      */
-    public static final Path CONFIGURATION_FOLDER = Paths.get("Configuration");
+    public static final Path CONFIGURATION_FOLDER = newPath(USER_DIR, "Configuration");
     /**
      * The previous state file
      */
@@ -52,17 +57,25 @@ public enum StellarDiskManager {
      */
     public static final Path HELP_TEXT_PATH = Paths.get(CONFIGURATION_FOLDER.toString(), "Help Text.dat");
 
-    /**
-     * The user directory.
-     */
-    public static final Path USER_DIR = Paths.get(System.getProperty("user.dir"));
-
+    public static final Path DEFAULT_PICTURES = newPath(CONFIGURATION_FOLDER, "Default Pictures");
     /**
      * The default object mapper for this application.
      */
     public static final ObjectMapper mapper = new ObjectMapper();
 
     private static final Logger logger = StellarLoggingFormatter.forClass(StellarDiskManager.class);
+
+    /**
+     * Selects a random picture from our cache of generic cover art.
+     *
+     * @return The path to the cover art
+     * @throws java.io.IOException If something went wrong
+     */
+    public static Path getGenericPicture() throws IOException {
+        List<Path> pictures = Files.list(DEFAULT_PICTURES).collect(Collectors.toList());
+        Path random = pictures.get(new Random().nextInt(pictures.size()));
+        return random;
+    }
 
     /**
      * Generates the album art image from the opus file, and puts it in the
@@ -73,52 +86,57 @@ public enum StellarDiskManager {
      * @param partialMetadata The partial (Only artist/title) metadata
      * @return The picture file generated
      */
-    private static Path generateImagefromOPUSFile(Path path, Map<StellarOPUSConverter.MetadataType, String> partialMetadata) throws IOException {
-        String noExtension = StellarOPUSConverter.FileExtension.stripFileExtension(path);
-        Path imageDataPath = newPath(tempDirectory, noExtension + ".dat");
-        processOP(true, tempDirectory, "exiftool", "-Picture", "-b", noExtension + ".opus");
-        return imageDataPath;
+    private static Path generateImagefromFile(Path path, Map<StellarOPUSConverter.MetadataType, String> partialMetadata) throws IOException {
+        //Decompose Picture Stored as Binary File
+        String noExtension = StellarOPUSConverter.stripFileExtension(path);
+        Path imageFile = newPath(REINDEXING_FOLDER, noExtension + ".png");
+        processOP(true, imageFile, REINDEXING_FOLDER, "exiftool", "-Picture", "-b", path.getFileName().toString());
+        return imageFile;
     }
 
     /**
-     * Gets a list of metadata from an already existing .opus file on the disk.
+     * Gets a list of metadata from an already existing file on the disk.
      *
      * @param path The path of the opus file
      * @return The metadata of the opus file
      * @throws java.io.IOException If something went wrong
      */
-    public static Map<StellarOPUSConverter.MetadataType, String> getOPUSMetadata(Path path) throws IOException {
-        Path metadataFilePath = StellarGravitonField.newPath(getTempDirectory(),
-                StellarOPUSConverter.FileExtension.stripFileExtension(path) + ".txt");
+    public static Map<StellarOPUSConverter.MetadataType, String> getMetadata(Path path) throws IOException {
+        Path metadataFilePath = newPath(REINDEXING_FOLDER, StellarOPUSConverter.stripFileExtension(path) + ".txt");
+        //Import .Opus File to ReIndexing Directory, Use Reindexing folder to avoid name clashes
+        Path reindexingOpusFile = newPath(REINDEXING_FOLDER, path.getFileName());
+        Files.createDirectories(REINDEXING_FOLDER);
+        Files.copy(path, reindexingOpusFile, StandardCopyOption.REPLACE_EXISTING);
         //Create Metadata file
-        processOP(true, tempDirectory, "exiftool", path.getFileName().toString());
+        processOP(true, metadataFilePath, REINDEXING_FOLDER, "exiftool", path.getFileName().toString());
         //Trim Entries from exiftool
-        List<String> lines = Files.readAllLines(metadataFilePath).stream().map(str -> str.trim().replaceAll("\u0020", ""))
-                .collect(Collectors.toList());
+        List<String> lines = Files.readAllLines(metadataFilePath).stream().collect(Collectors.toList());
         Map<StellarOPUSConverter.MetadataType, String> metadata = StellarOPUSConverter.getDefaultMetadata();
         for (String str : lines) {
-            if (str.contains("Artist")) {
+            String contents = str.split(":")[0];
+            if (contents.matches("Artist\\s+")) {
                 //Data is always after the : character
-                String artist = str.split(":")[1];
+                String artist = preferredTitleFormat(str.split(":")[1].trim());
                 //Map Behaviour overwrites existing entry
                 metadata.put(StellarOPUSConverter.MetadataType.ARTIST, artist);
-            } else if (str.contains("Title")) {
+            } else if (contents.matches("Title\\s+")) {
                 //Data is always after the : character
-                String title = str.split(":")[1];
+                String title = preferredTitleFormat(str.split(":")[1].trim());
                 //Map Behaviour overwrites existing entry
                 metadata.put(StellarOPUSConverter.MetadataType.TITLE, title);
+            } else if (contents.matches("Picture\\s+")) {
+                Path picturePath = generateImagefromFile(path, metadata);
+                //Attempt Picture Reconstruction
+                //If the picture file is less than 100 bytes, there was no image data in the .opus file, we'll have to ask the user for it
+                if (Files.size(picturePath) < 100) {
+                    //Put default metadata into metadata map
+                    metadata.put(StellarOPUSConverter.MetadataType.ALBUM_ART,
+                            StellarOPUSConverter.getDefaultMetadata().get(StellarOPUSConverter.MetadataType.ALBUM_ART));
+                } else {
+                    //Get Picture File Path & Insert into Map
+                    metadata.put(StellarOPUSConverter.MetadataType.ALBUM_ART, picturePath.toAbsolutePath().toString());
+                }
             }
-        }
-        //Atempt Picture Reconstruction
-        Path picturePath = generateImagefromOPUSFile(path, metadata);
-        //If the picture file is less than 100 bytes, there was no image data in teh.opus file, we'll have to ask the user for it
-        if (Files.size(picturePath) < 100) {
-            //Put default metadata into metadata map
-            metadata.put(StellarOPUSConverter.MetadataType.ALBUM_ART,
-                    StellarOPUSConverter.getDefaultMetadata().get(StellarOPUSConverter.MetadataType.ALBUM_ART));
-        } else {
-            //Get Picture File Path & Insert into Map
-            metadata.put(StellarOPUSConverter.MetadataType.ALBUM_ART, picturePath.toAbsolutePath().toString());
         }
         return metadata;
     }
@@ -199,7 +217,13 @@ public enum StellarDiskManager {
         outputFolder = newOutputFolder;
     }
 
+    /**
+     * The Space-Bridge Directory
+     */
     private static Path outputFolder = USER_DIR, pictureOutputFolder = USER_DIR, spaceBridgeDirectory;
+    /**
+     * The path of the temp folder.
+     */
     private static final Path tempDirectory;
 
     static {
@@ -227,6 +251,25 @@ public enum StellarDiskManager {
             throw new IllegalStateException("We encountered an IO error, the disk might be full."
                     + " We couldn't create our temporary directory", ex);
         }
+    }
+
+    /**
+     * The folder used for re-indexing operations.
+     */
+    public static final Path REINDEXING_FOLDER = newPath(StellarDiskManager.tempDirectory, "ReIndexing");
+
+    /**
+     * Copies a file to the temporary directory from the specified directory.
+     *
+     * @param filePath The file to copy
+     * @return The file location after it has been copied over
+     * @throws IOException If something happened
+     */
+    public static Path copyToReindexing(Path filePath) throws IOException {
+        Path destination = StellarGravitonField.newPath(REINDEXING_FOLDER, filePath.getFileName());
+        logger.fine(tempDirectory.toString());
+        Files.copy(filePath, destination, StandardCopyOption.REPLACE_EXISTING);
+        return destination;
     }
 
     /**

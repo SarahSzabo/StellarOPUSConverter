@@ -5,6 +5,7 @@
  */
 package com.protonmail.sarahszabo.stellaropusconverter;
 
+import com.protonmail.sarahszabo.stellaropusconverter.util.StellarGravitonField;
 import static com.protonmail.sarahszabo.stellaropusconverter.util.StellarGravitonField.messageThenExit;
 import com.protonmail.sarahszabo.stellaropusconverter.util.StellarGreatFilter;
 import java.io.IOException;
@@ -12,6 +13,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Arrays;
+import java.util.Map;
+import java.util.logging.Logger;
 
 /**
  * The main class.
@@ -22,11 +25,12 @@ public class Main {
 
     /**
      * @param args the command line arguments
+     * @throws java.io.IOException If something went wrong
      */
     public static void main(String[] args) throws IOException {
         //We have to check greater than section first, then we check integer comparison
         //Odd Number of Entries >= 3 (URL, timestamp0 timestamp1 timestamp2 timestamp3
-        if (args.length >= 3 && firstArgIsLink(args[0]) && (args.length + 1) % 2 == 0
+        if (args.length >= 3 && argIsLink(args[0]) && (args.length + 1) % 2 == 0
                 && allStringsAreTimestamps(args)) {
             StellarMode.LINK_TIMESTAMPS.start(args);
         } //Rest of integer comparisons
@@ -35,7 +39,7 @@ public class Main {
             printHelp();
         } //Direct Link Conversion
         else if (args.length == 1) {
-            if (firstArgIsLink(args[0])) {
+            if (argIsLink(args[0])) {
                 StellarMode.DIRECT_LINK.start(args);
             } //Init Graphical File Chooser
             else if (args[0].equalsIgnoreCase("-G")) {
@@ -65,25 +69,45 @@ public class Main {
                     Path path = StellarUI.getFolderFor("Picture Folder")
                             .orElse(StellarDiskManager.USER_DIR);
                     StellarDiskManager.setPictureOutputFolder(path);
-                    messageThenExit("Output Folder Changed To:" + path);
+                    messageThenExit("Picture Folder Changed To:" + path);
                 } else if (args[1].equalsIgnoreCase("Output-Folder")) {
                     Path path = StellarUI.getFolderFor("Output Folder")
                             .orElse(StellarDiskManager.USER_DIR);
                     StellarDiskManager.setOutputFolder(path);
-                    messageThenExit("Picture Folder Changed To: " + path);
+                    messageThenExit("Output Folder Changed To: " + path);
                 } else if (args[1].equalsIgnoreCase("Space-Bridge-Folder")) {
                     Path path = StellarUI.getFolderFor("Space-Bridge Folder")
                             .orElse(StellarDiskManager.USER_DIR);
                     StellarDiskManager.setSpaceBridgeDirectory(path);
                     messageThenExit("Space-Bridge Folder Changed To: " + path);
+                } //Set Picture Metadata
+                if (args[1].equalsIgnoreCase("AlbumArt")) {
+                    Path opusFile = StellarUI.getFilesFromClipboard().get(0), imageFile = StellarUI.getFile("Select an Image File",
+                            StellarUI.EXTENSION_FILTER.PICTURE_FILES).orElseThrow(()
+                                    -> new RuntimeException("User did not choose an image, aborting"));
+                    if (opusFile == null || imageFile == null) {
+                        throw new IllegalStateException("Attempt to set album art with null clipboard opus file or null image selected");
+                    }
+                    //Get metadata from file
+                    Map<StellarOPUSConverter.MetadataType, String> metadata
+                            = StellarDiskManager.getMetadata(opusFile);
+                    //Set to new image
+                    metadata.put(StellarOPUSConverter.MetadataType.ALBUM_ART, imageFile.toAbsolutePath().toString());
+                    //Map new metadata to opus file
+                    StellarOPUSConverter converter = new StellarOPUSConverter(StellarGravitonField.newPath(opusFile),
+                            StellarDiskManager.getOutputFolder(), Logger.getLogger(StellarOPUSConverter.class.getName()), metadata);
+                    converter.reIndexOPUSFile();
+
                 }
             } else {
                 printHelp();
             }
         } else if (args.length == 3) {
             //Manually Specify Author/Title with Timestamps
-            if (firstArgIsLink(args[0]) && !allStringsAreTimestamps(args)) {
+            if (argIsLink(args[0]) && !allStringsAreTimestamps(args)) {
                 stellarConversion(StellarMode.LINK_AUTHOR_TITLE, args);
+            } else if (args[0].equalsIgnoreCase("Space-Bridge") && args[1].equalsIgnoreCase("ReIndex")) {
+                SpaceBridge.SPACE_BRIDGE.initReIndexingBridge(Integer.valueOf(args[2]));
             } else {
                 printHelp();
             }
@@ -103,7 +127,7 @@ public class Main {
      * @return If they all match timstamp format
      */
     private static boolean allStringsAreTimestamps(String[] args) {
-        if (firstArgIsLink(args[0])) {
+        if (argIsLink(args[0])) {
             return allStringsAreTimestampsActual(Arrays.copyOfRange(args, 1, args.length));
         } else {
             return allStringsAreTimestampsActual(args);
@@ -126,7 +150,7 @@ public class Main {
      * @param arg The argument
      * @return If it is a link
      */
-    private static boolean firstArgIsLink(String arg) {
+    private static boolean argIsLink(String arg) {
         return Files.exists(Paths.get(arg));
     }
 

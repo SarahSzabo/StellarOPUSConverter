@@ -79,7 +79,7 @@ public enum StellarMode {
                     //Add conversion tasks to list for conversion
                     taskList.add(() -> {
                         StellarOPUSConverter converter = new StellarOPUSConverter(path);
-                        return converter.convertToOPUS(s, e);
+                        return converter.convertToOPUS(s, e).get();
                     });
                 } else {
                     start = timestamps.get(i);
@@ -146,7 +146,7 @@ public enum StellarMode {
         private Callable<Path> toTaskFormat(Path filePath, String artist) {
             return () -> {
                 StellarOPUSConverter converter = new StellarOPUSConverter(filePath);
-                return converter.convertToOPUS(artist, StellarOPUSConverter.FileExtension.stripFileExtension(filePath));
+                return converter.convertToOPUS(artist, StellarOPUSConverter.FileExtension.stripFileExtension(filePath)).get();
             };
         }
     };

@@ -87,7 +87,7 @@ public class StellarHyperspace {
         List<Callable<Path>> hyperspaceTasks = tasks.stream().map(path -> {
             return (Callable<Path>) () -> {
                 StellarOPUSConverter converter = new StellarOPUSConverter(path);
-                return converter.convertToOPUS();
+                return converter.convertToOPUS().get();
             };
         }).collect(Collectors.toList());
         try {

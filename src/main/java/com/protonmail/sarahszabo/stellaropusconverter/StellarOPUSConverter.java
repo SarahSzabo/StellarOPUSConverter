@@ -18,6 +18,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.logging.ConsoleHandler;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -27,12 +28,23 @@ import java.util.stream.Collectors;
 
 /**
  * A converter that converts files to the OPUS format. NOTE: Requires these
- * libraries to use successfully: *Buntu OS Terminal Libraries ">" to file
- * operator, exiftool, ffmpeg.
+ * libraries to use successfully: exiftool, ffmpeg, and opusenc libraries.
  *
  * @author Sarah Szabo <PhysicistSarah@Gmail.com>
  */
 public class StellarOPUSConverter {
+
+    /**
+     * Strips the file extension off newPath the fileName and returns it.
+     * Convenience subroutine for {@link FileExtension#stripFileExtension(java.nio.file.Path)
+     * }
+     *
+     * @param path The path to have stripped
+     * @return The stripped file name
+     */
+    public static String stripFileExtension(Path path) {
+        return FileExtension.stripFileExtension(path);
+    }
 
     /**
      * Gets the filename format for the image conversion process. The metadata
@@ -59,6 +71,67 @@ public class StellarOPUSConverter {
         return metadata;
     }
 
+    /**
+     * A utility method for getting metadata from the targetted filename.
+     * Specify the regex for the separator. Filename usually take on the form
+     * newPath SONGAUTHOR -- SONGTITLE. Separators usually look like "[-+]".
+     *
+     * @param seperator The regular expression used for the separator
+     * @return The metadata list
+     */
+    private static List<String> getListFromRegex(String seperator, Path filePath) {
+        //Filters out the empty space in returned list and maps it to a list after trimming empty space
+        String originalFileNameNoEXT = stripFileExtension(filePath);
+        return Arrays.asList(originalFileNameNoEXT.split(seperator)).stream().filter(string -> !string.isEmpty())
+                .map(string -> string.trim()).collect(Collectors.toList());
+    }
+
+    /**
+     * The previous program versions used a list to keep track of metadata, this
+     * is an adapter subroutine for that format.
+     */
+    private static Map<MetadataType, String> listToMap(List<String> list) {
+        Map<MetadataType, String> map = new HashMap<>(2);
+        map.put(MetadataType.ARTIST, list.get(0));
+        map.put(MetadataType.TITLE, list.get(1));
+        return map;
+    }
+
+    /**
+     * Tests to see if the format is matched. Specify the regex for the
+     * separator. Filename usually take on the form newPath SONGAUTHOR --
+     * SONGTITLE. Separators usually look like "+" or "|". Returns a list that,
+     * by convention has zeroith element as the artist, and second element as
+     * the title.
+     *
+     * @param separators The regular expressions to use
+     * @return The metadata list
+     */
+    private static Map<MetadataType, String> generateMetadataFromRegex(Path filePath, String... separators) {
+        List<String> dividers = Arrays.asList(separators);
+        Map<MetadataType, String> map = getDefaultMetadata();
+        String originalFileNameNoEXT = stripFileExtension(filePath);
+        if (dividers.stream().anyMatch(separator -> originalFileNameNoEXT.matches(".*[" + separator + "]+.*"))) {
+            //Maps to proper metadata format
+            map.putAll(listToMap(getListFromRegex("[" + dividers.stream().filter(separator
+                    -> originalFileNameNoEXT.matches(".*[" + separator + "+].*")).findFirst().get() + "*]", filePath).stream()
+                    .map(string -> preferredTitleFormat(string)).collect(Collectors.toList())));
+        }
+        return map;
+    }
+
+    /**
+     * Gets the title and author from the file name, and fills the map with this
+     * data.
+     *
+     * @param filePath The path of the file for which metadata analysis is
+     * taking place
+     * @return The map of the metadata found or
+     * {@link StellarOPUSConverter#getDefaultMetadata()} if none was found
+     */
+    public static Map<MetadataType, String> generateMetadata(Path filePath) {
+        return generateMetadataFromRegex(filePath, "-", "|", "/");
+    }
     private final String originalFileNameNoEXT, originalFileNameNoEXTPreferred;
     private final Path originalFilePath, outputFolder;
     private final Map<MetadataType, String> metadata;
@@ -69,14 +142,16 @@ public class StellarOPUSConverter {
 
     /**
      * Constructs a new {@link StellarOPUSConverter} with the specified file
-     * path and manually specified output folder.
+     * path and manually specified output folder. NOTE: the album art of the
+     * metadata should be an absolute path to the image file.
      *
      * @param filePath The file for conversion
      * @param outputFolder The path to put the finished file in
      * @param logger The cartographer to use with this converter
+     * @param metadata The metadata to use for this converter
      * @throws java.io.IOException If something happened
      */
-    public StellarOPUSConverter(Path filePath, Path outputFolder, Logger logger) throws IOException {
+    public StellarOPUSConverter(Path filePath, Path outputFolder, Logger logger, Map<MetadataType, String> metadata) throws IOException {
         //Run through filters before accepting path
         this.originalFilePath = Objects.requireNonNull(StellarGreatFilter.filterPaths(Arrays.asList(filePath)).get(0));
         this.outputFolder = Objects.requireNonNull(outputFolder);
@@ -90,6 +165,7 @@ public class StellarOPUSConverter {
             Matcher matcher = pattern.matcher(this.originalFilePath.getFileName().toString());
             if (matcher.find()) {
                 dummyExtension = extension;
+                break;
             }
         }
         if (dummyExtension == null) {
@@ -100,7 +176,24 @@ public class StellarOPUSConverter {
         this.originalFileNameNoEXTPreferred = preferredTitleFormat(this.originalFileNameNoEXT);
         this.opusFileName = preferredTitleFormat(this.originalFileNameNoEXTPreferred + ".opus");
         this.opusFilePath = newPath(this.outputFolder, this.opusFileName);
-        this.metadata = new HashMap<>(3);
+        //Artist/Title Cannot be Null
+        if (metadata.get(MetadataType.ARTIST) == null || metadata.get(MetadataType.TITLE) == null) {
+            throw new IllegalArgumentException("Artist/Title cannot be null in passed metadata");
+        }
+        this.metadata = new HashMap<>(Objects.requireNonNull(metadata));
+    }
+
+    /**
+     * Constructs a new {@link StellarOPUSConverter} with the specified file
+     * path and manually specified output folder.
+     *
+     * @param filePath The file for conversion
+     * @param outputFolder The path to put the finished file in
+     * @param logger The cartographer to use with this converter
+     * @throws java.io.IOException If something happened
+     */
+    public StellarOPUSConverter(Path filePath, Path outputFolder, Logger logger) throws IOException {
+        this(filePath, outputFolder, logger, StellarDiskManager.getMetadata(filePath));
     }
 
     /**
@@ -127,9 +220,21 @@ public class StellarOPUSConverter {
     }
 
     /**
+     * Checks if the metadata has been modified from the default settings.
+     *
+     * @return Whether or not this is true
+     */
+    private boolean metadataModified() {
+        return !this.metadata.equals(getDefaultMetadata());
+    }
+
+    /**
      * Re indexes an OPUS file, applying modern standards to older versions of
      * .opus files. Uses 320K by default. The .opus file must exist already to
-     * use this subroutine.
+     * use this subroutine. Chains to
+     * {@link StellarOPUSConverter#reIndexOPUSFile(int)}
+     *
+     * @throws java.io.IOException If something went wrong
      */
     public void reIndexOPUSFile() throws IOException {
         reIndexOPUSFile(320);
@@ -148,40 +253,18 @@ public class StellarOPUSConverter {
     /**
      * Re indexes an OPUS file, applying modern standards to older versions of
      * .opus files. Has a parameter for bitrate, ex: 320 -> 320K. The .opus file
-     * must exist already to use this subroutine.
+     * must exist already to use this subroutine. Uses the metadata provided in
+     * the constructor, or defaults if none were set.
      *
      * @param bitrate The bitrate in K
      * @throws java.io.IOException If something went wrong
      */
     public void reIndexOPUSFile(int bitrate) throws IOException {
         checkFileExists();
-        Path tempFilePath = StellarDiskManager.copyToTemp(this.originalFilePath);
-        Map<MetadataType, String> metadata = StellarDiskManager.getOPUSMetadata(this.opusFilePath);
-        this.metadata.putAll(metadata);
-        //Convert to FLAC intermediate, opusenc only converts other formats, also FLAC is lossess, so should be OK as far as quality is concerned.
-        String flacFileName = FileExtension.stripFileExtension(tempFilePath) + ".flac";
-        processOP("ffmpeg", "-i", tempFilePath.getFileName().toString(), flacFileName);
-        //Convert Back to .opus
-        //Is the picture metadata aready set?
-        if (!metadata.get(MetadataType.ALBUM_ART).equalsIgnoreCase(getDefaultMetadata().get(MetadataType.ALBUM_ART))) {
-            //We have the picture metadata
-            processOP("opusenc", flacFileName, FileExtension.stripFileExtension(tempFilePath) + ".opus",
-                    "--bitrate", bitrate + "k", "--title", metadata.get(MetadataType.TITLE), "--artist", metadata.get(MetadataType.ARTIST),
-                    "--picture", metadata.get(MetadataType.ALBUM_ART));
-        } else {
-            //We have to set the picture ourselves, get it from the picture output folder
-            Path picturePath = newPath(StellarDiskManager.getPictureOutputFolder(), getImageFileName()).toAbsolutePath();
-            if (!Files.exists(picturePath)) {
-                //Bad, the picture doesn't exist, ask the user for it
-                picturePath = StellarUI.getFile("Select a .JPEG or .PNG file").orElseThrow(()
-                        -> new IllegalStateException("Setting New Picture Aborted"));
-            }
-            //Set the picture & bitrate
-            processOP("opusenc", flacFileName, FileExtension.stripFileExtension(tempFilePath) + ".opus",
-                    "--bitrate", bitrate + "k", "--title", metadata.get(MetadataType.TITLE), "--artist", metadata.get(MetadataType.ARTIST),
-                    "--picture", picturePath.toString());
-            //TODO Test Added Subroutines
-        }
+        //Convert to .opus
+        Path opusFile = toOpusFile(bitrate, null, null);
+        //Copy Converted File to Output Directory
+        StellarDiskManager.copyFromTemp(opusFile.getFileName().toString());
     }
 
     /**
@@ -192,7 +275,7 @@ public class StellarOPUSConverter {
      * @return The file path newPath the .opus file.
      * @throws IOException If something went wrong
      */
-    public Path convertToOPUSNoAutomaticMetadata() throws IOException {
+    public Optional<Path> convertToOPUSNoAutomaticMetadata() throws IOException {
         this.metadata.put(MetadataType.ARTIST, getDefaultMetadata().get(MetadataType.ARTIST));
         this.metadata.put(MetadataType.TITLE, this.originalFileNameNoEXT);
         return convertToOPUS(this.metadata.get(MetadataType.ARTIST), this.metadata.get(MetadataType.TITLE));
@@ -201,14 +284,49 @@ public class StellarOPUSConverter {
     /**
      * Converts the selected file to .OPUS. Makes a best effort to get the title
      * name and artist name from the filename. Works if the filename looks like
-     * MyTitle -- MyTrack.mp4.
+     * MyTitle -- MyTrack.mp4. If the metadata has been set, this subroutine
+     * defaults to the set metadata.
+     *
+     * @param bitrate The bitrate for the converted files
+     * @return The file path newPath the .opus file.
+     * @throws IOException If something went wrong
+     */
+    public Optional<Path> convertToOPUS(int bitrate) throws IOException {
+        //If Metadata not modified from default, generate metadata
+        if (this.fileExtension == FileExtension.MP4) {
+            generateMetadata();
+            return convertToOPUS(this.metadata.get(MetadataType.ARTIST), this.metadata.get(MetadataType.TITLE));
+        }//Metadata modified, return opus file with set metadata
+        else {
+            //Attempt to set Metadata if We Have SOME default fields
+            Map<MetadataType, String> map = generateMetadata(this.originalFilePath);
+            //Set Metadata if not already present
+            if (map.get(MetadataType.TITLE).equalsIgnoreCase(getDefaultMetadata().get(MetadataType.TITLE))) {
+                this.metadata.put(MetadataType.TITLE, this.originalFileNameNoEXTPreferred);
+            } //Metadata mapping found data, set it
+            else {
+                this.metadata.put(MetadataType.TITLE, map.get(MetadataType.TITLE));
+                this.metadata.put(MetadataType.ARTIST, map.get(MetadataType.ARTIST));
+            }
+            //If The Default metadata is Present, Select a Random Default Image
+            if (this.metadata.get(MetadataType.ALBUM_ART).equalsIgnoreCase(getDefaultMetadata().get(MetadataType.ALBUM_ART))) {
+                this.metadata.put(MetadataType.ALBUM_ART, StellarDiskManager.getGenericPicture().toAbsolutePath().toString());
+            }
+            return Optional.of(toOpusFile(bitrate));
+        }
+    }
+
+    /**
+     * Converts the selected file to .OPUS. Makes a best effort to get the title
+     * name and artist name from the filename. Works if the filename looks like
+     * MyTitle -- MyTrack.mp4. If the metadata has been set, this subroutine
+     * defaults to the set metadata.
      *
      * @return The file path newPath the .opus file.
      * @throws IOException If something went wrong
      */
-    public Path convertToOPUS() throws IOException {
-        generateMetadata();
-        return convertToOPUS(this.metadata.get(MetadataType.ARTIST), this.metadata.get(MetadataType.TITLE));
+    public Optional<Path> convertToOPUS() throws IOException {
+        return convertToOPUS(320);
     }
 
     /**
@@ -219,7 +337,7 @@ public class StellarOPUSConverter {
      * @return The Path to the converted File
      * @throws IOException If something happened
      */
-    public Path convertToOPUS(String artist, String title) throws IOException {
+    public Optional<Path> convertToOPUS(String artist, String title) throws IOException {
         return convertToOPUS(artist, title, 320);
     }
 
@@ -256,7 +374,7 @@ public class StellarOPUSConverter {
         //Fast FLAC Audio ripped from video
         //ffmpeg -i "video.m2ts" -vn -sn -acodec flac -compression_level 12 "audio.flac"
         processOP(true, "ffmpeg", "-i", this.originalFilePath.getFileName().toString(), "-vn", "-sn", "-acodec", "flac",
-                "-compression_level", "12", title);
+                "-compression_level", "0", title);
         return newPath(StellarDiskManager.getTempDirectory(), title);
     }
 
@@ -270,14 +388,38 @@ public class StellarOPUSConverter {
      *
      * @param bitrate The bitrate in K
      * @return The path to the newly created .opus file
-     * @throws IOException If somethong went wrong
+     * @throws IOException If something went wrong
+     */
+    private Path toOpusFile(int bitrate) throws IOException {
+        return toOpusFile(bitrate, null, null);
+    }
+
+    /**
+     * Uses opusenc to create a .opus file from a temporary .flac file. Both
+     * timestamps may be null. If the either timestamp is null, the times are
+     * ignored.
+     *
+     * @param start The start time
+     * @param end The end time
+     *
+     * @param bitrate The bitrate in K
+     * @return The path to the newly created .opus file
+     * @throws IOException If something went wrong
      */
     private Path toOpusFile(int bitrate, StellarFFMPEGTimeStamp start, StellarFFMPEGTimeStamp end) throws IOException {
         Path flacFile = start == null || end == null ? toFlacFile() : toFlacFile(start, end);
+        //Delete Intermediate .opus File Before Running New .opus Conversion
+        Files.deleteIfExists(newPath(StellarDiskManager.getTempDirectory(), this.opusFileName));
         String title = FileExtension.stripFileExtension(flacFile) + ".opus";
         processOP(true, "opusenc", flacFile.getFileName().toString(), title,
-                "--bitrate", bitrate + "k", "--title", metadata.get(MetadataType.TITLE), "--artist", metadata.get(MetadataType.ARTIST),
-                "--picture", metadata.get(MetadataType.ALBUM_ART));
+                "--bitrate", bitrate + "k", "--title", this.metadata.get(MetadataType.TITLE), "--artist", this.metadata.get(MetadataType.ARTIST),
+                "--picture", this.metadata.get(MetadataType.ALBUM_ART));
+        //If we have metadata title, return that as the filename
+        String fileTitle = this.metadata.get(MetadataType.TITLE).equalsIgnoreCase(getDefaultMetadata().get(MetadataType.TITLE))
+                ? this.opusFileName : this.metadata.get(MetadataType.TITLE) + ".opus";
+        //Copy Back from temp folder
+        Files.copy(newPath(StellarDiskManager.getTempDirectory(), this.metadata.get(MetadataType.TITLE) + ".opus"),
+                newPath(this.outputFolder, fileTitle), StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.COPY_ATTRIBUTES);
         return newPath(StellarDiskManager.getTempDirectory(), title);
     }
 
@@ -291,12 +433,7 @@ public class StellarOPUSConverter {
      * @return The Path to the converted File
      * @throws IOException If something happened
      */
-    public Path convertToOPUS(String artist, String title, int bitrate) throws IOException {
-        //If Metadata Not Already Generated, Set it
-        if (this.metadata.isEmpty()) {
-            this.metadata.put(MetadataType.ARTIST, preferredTitleFormat(artist));
-            this.metadata.put(MetadataType.TITLE, preferredTitleFormat(title));
-        }
+    public Optional<Path> convertToOPUS(String artist, String title, int bitrate) throws IOException {
         copyOP(() -> {
             try {
                 //Create Image
@@ -310,7 +447,7 @@ public class StellarOPUSConverter {
         });
         //Clear Metadata to Restore Default State for next use
         this.metadata.clear();
-        return Paths.get(StellarDiskManager.getOutputFolder().toString(), title + ".opus");
+        return Optional.of(newPath(StellarDiskManager.getOutputFolder(), title + ".opus"));
     }
 
     /**
@@ -326,7 +463,6 @@ public class StellarOPUSConverter {
      */
     public Path decreaseBitrate() throws IOException {
         checkFileExists();
-        this.metadata.put(MetadataType.ARTIST, "Unknown Artist");
         this.metadata.put(MetadataType.TITLE, this.originalFilePath.getFileName().toString().replace(this.fileExtension.toString(), ""));
         copyOPSameFileName(() -> {
             try {
@@ -366,7 +502,7 @@ public class StellarOPUSConverter {
      * @return The path to the newly created file
      * @throws java.io.IOException If something happened
      */
-    public Path convertToOPUS(StellarFFMPEGTimeStamp start, StellarFFMPEGTimeStamp end) throws IOException {
+    public Optional<Path> convertToOPUS(StellarFFMPEGTimeStamp start, StellarFFMPEGTimeStamp end) throws IOException {
         //Convert to Proper Format
         StellarUI.askUserForArtistTitle("Start: " + start + "\nEnd: " + end)
                 .entrySet().stream().map(entry -> new Map.Entry<MetadataType, String>() {
@@ -404,7 +540,7 @@ public class StellarOPUSConverter {
      * @throws IllegalArgumentException If start or end is not in the specified
      * format, or if start is less than or equal to zero.
      */
-    public Path convertToOPUS(String artist, String title, StellarFFMPEGTimeStamp start, StellarFFMPEGTimeStamp end) throws IOException {
+    public Optional<Path> convertToOPUS(String artist, String title, StellarFFMPEGTimeStamp start, StellarFFMPEGTimeStamp end) throws IOException {
         return convertToOPUS(320, artist, title, start, end);
     }
 
@@ -423,7 +559,7 @@ public class StellarOPUSConverter {
      * @throws IllegalArgumentException If start or end is not in the specified
      * format, or if start is less than or equal to zero.
      */
-    public Path convertToOPUS(int bitrate, String artist, String title, StellarFFMPEGTimeStamp start, StellarFFMPEGTimeStamp end) throws IOException {
+    public Optional<Path> convertToOPUS(int bitrate, String artist, String title, StellarFFMPEGTimeStamp start, StellarFFMPEGTimeStamp end) throws IOException {
         requireNonNullIterated(artist, title, start, end);
         if (artist.isEmpty() || title.isEmpty()) {
             throw new IllegalArgumentException("One of the fields is empty!");
@@ -449,32 +585,7 @@ public class StellarOPUSConverter {
         reIndexOPUSFile();
         //Clear Metadata to Restore to Default State
         this.metadata.clear();
-        return Paths.get(StellarDiskManager.getOutputFolder().toString(), title + ".opus");
-    }
-
-    /**
-     * A utility method for getting metadata from the targetted filename.
-     * Specify the regex for the separator. Filename usually take on the form
-     * newPath SONGAUTHOR -- SONGTITLE. Separators usually look like "[-+]".
-     *
-     * @param seperator The regular expression used for the separator
-     * @return The metadata list
-     */
-    private List<String> getListFromRegex(String seperator) {
-        //Filters out the empty space in returned list and maps it to a list after trimming empty space
-        return Arrays.asList(this.originalFileNameNoEXT.split(seperator)).stream().filter(string -> !string.isEmpty())
-                .map(string -> string.trim()).collect(Collectors.toList());
-    }
-
-    /**
-     * The previous program versions used a list to keep track of metadata, this
-     * is an adapter subroutine for that format.
-     */
-    private Map<MetadataType, String> listToMap(List<String> list) {
-        Map<MetadataType, String> map = new HashMap<>(2);
-        map.put(MetadataType.ARTIST, list.get(0));
-        map.put(MetadataType.TITLE, list.get(1));
-        return map;
+        return Optional.of(newPath(StellarDiskManager.getOutputFolder(), title + ".opus"));
     }
 
     /**
@@ -485,6 +596,7 @@ public class StellarOPUSConverter {
      * the title.
      *
      * @param separators The regular expressions to use
+     * @param map The map to fill with the metadata
      * @return The metadata list
      */
     private void generateMetadataFromRegex(String... separators) {
@@ -492,18 +604,17 @@ public class StellarOPUSConverter {
         if (dividers.stream().anyMatch(separator -> this.originalFileNameNoEXT.matches(".*[" + separator + "]+.*"))) {
             //Maps to proper metadata format
             this.metadata.putAll(listToMap(getListFromRegex("[" + dividers.stream().filter(separator
-                    -> this.originalFileNameNoEXT.matches(".*[" + separator + "+].*")).findFirst().get() + "*]").stream()
+                    -> this.originalFileNameNoEXT.matches(".*[" + separator + "+].*")).findFirst().get() + "*]", this.originalFilePath).stream()
                     .map(string -> preferredTitleFormat(string)).collect(Collectors.toList())));
-
         } else {
             this.metadata.putAll(StellarUI.askUserForArtistTitle(this.originalFileNameNoEXT));
         }
     }
 
     /**
-     * Gets the title and author from the file name. By convention, the zeroith
-     * element is the artist, and the first is the title track.
+     * Gets the title and author from the file name
      *
+     * @param map The map to fill with metadata
      * @return The list newPath information, or empty if none was available
      */
     private void generateMetadata() {
@@ -593,7 +704,7 @@ public class StellarOPUSConverter {
      */
     private void processImage() throws IOException, InterruptedException {
         Path imageFilePath = this.fileExtension == FileExtension.MP4 ? newPath(StellarDiskManager.getPictureOutputFolder(), getImageFileName())
-                : StellarUI.getFile("Choose an Image for " + this.opusFileName)
+                : StellarUI.getFile("Choose an Image for " + this.opusFileName, StellarUI.EXTENSION_FILTER.PICTURE_FILES)
                         .orElseThrow(() -> new RuntimeException("No Image Selected, program aborting"));
         //If we're pointing at a video file, get it's image at 25s
         if (this.fileExtension == FileExtension.MP4) {
@@ -645,6 +756,13 @@ public class StellarOPUSConverter {
      * An enum representing a file extension.
      */
     public static enum FileExtension {
+        M4A {
+            @Override
+            public String toString() {
+                return ".m4a";
+            }
+
+        },
         FLAC {
             @Override
             public String toString() {
@@ -716,7 +834,7 @@ public class StellarOPUSConverter {
          * @return The list newPath commands needing execution
          */
         public List<String> getLowBitrateConversion(Path inputFile) {
-            return new ProcessBuilder("ffmpeg", "-i", inputFile.getFileName().toString(), "-b:a", "160k", "-strict",
+            return new ProcessBuilder("ffmpeg", "-i", inputFile.getFileName().toString(), "-b:a", "190k", "-strict",
                     "-2", preferredTitleFormat(inputFile.getFileName().toString().replace(toString(), "") + "(((Copy))).opus")).command();
         }
 

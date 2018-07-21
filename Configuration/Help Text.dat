@@ -18,6 +18,8 @@ Alternate Modes:
 Space-Bridge = Enables the Space-Bridge Mobile Conversion Functionality. This watches a certain directory and all sub-directories
  and converts them to 120K for mobile devices.
 
+Space-Bridge ReIndex 190 = Re-Index the Space-Bridge Watching Folder at 190K bitrate and apply latest conversion standards to old music library
+
 Region-Scan = Scans the Clipboard for Files whose names can be optimised.
 Applies filters to the names and changes them. Retains original file extensions.
 
@@ -26,6 +28,9 @@ Set Pictures-Folder = Change the Picture Output Folder
 Set Output-Folder = Change the Output Folder for Files
 Set Space-Bridge-Folder = Change the Space=Bridge Watch Folder
 Status = Print Current Status (Folder Locations)
+
+Metadata Settings:
+Set AlbumArt = Sets the opus file on the clipboard with the picture file from a file chooser
 
 Currently Supported Formats: .MP4, .MP3, .OPUS
 Note: .OPUS -> .OPUS conversions are possible, the metadata will be copied over once you set it, per the usual conversion process.

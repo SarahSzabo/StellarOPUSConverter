@@ -14,6 +14,7 @@ import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeFormatterBuilder;
 import java.time.temporal.ChronoField;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import java.util.logging.Handler;
 import java.util.logging.Level;
@@ -48,9 +49,23 @@ public class StellarGravitonField {
      * @param commands The commands to execute
      * @param inheritIO Merge the process streams?
      * @throws IOException InterruptedException If something went wrong
+     * @return Whether or not the operation timed out or not
      */
-    public static void processOP(List<String> commands, boolean inheritIO) throws IOException {
-        processOP(inheritIO, commands.toArray(new String[4]));
+    public static boolean processOP(List<String> commands, boolean inheritIO) throws IOException {
+        return processOP(inheritIO, commands.toArray(new String[4]));
+    }
+
+    /**
+     * Launches a new process in the temp directory, and waits for its
+     * completion. Does not inherit IO.
+     *
+     * @param directory The directory to be in
+     * @param commands The commands to execute
+     * @throws IOException InterruptedException If something went wrong
+     * @return Whether or not the operation timed out or not
+     */
+    public static boolean processOP(Path directory, String... commands) throws IOException {
+        return processOP(false, null, StellarDiskManager.REINDEXING_FOLDER, commands);
     }
 
     /**
@@ -59,9 +74,40 @@ public class StellarGravitonField {
      *
      * @param commands The commands to execute
      * @throws IOException InterruptedException If something went wrong
+     * @return Whether or not the operation timed out or not
      */
-    public static void processOP(String... commands) throws IOException {
-        processOP(false, commands);
+    public static boolean processOP(String... commands) throws IOException {
+        return processOP(false, commands);
+    }
+
+    /**
+     * Launches a new process in the temp directory, and waits for its
+     * completion.
+     *
+     * @param inheritIO Should the streams be merged
+     * @param redirect The path to direct output from the process to, if null,
+     * prints to terminal
+     * @param directory The directory to be in
+     * @param commands The commands to execute
+     * @throws IOException InterruptedException If something went wrong
+     * @return Whether or not the operation timed out or not
+     */
+    public static boolean processOP(boolean inheritIO, Path redirect, Path directory, String... commands) throws IOException {
+        ProcessBuilder builder = processOPBuilder(inheritIO, redirect, directory, commands);
+        //Print out FFMPEG Command
+        logger.info("COMMAND: " + builder.command().stream().collect(Collectors.joining(" ")));
+        //Actually do it
+        Process proc = builder.start();
+        try {
+            proc.waitFor(30, TimeUnit.SECONDS);
+            if (proc.isAlive()) {
+                proc.destroyForcibly();
+                return false;
+            }
+        } catch (InterruptedException ex) {
+            Logger.getLogger(StellarGravitonField.class.getName()).log(Level.SEVERE, null, ex);
+        }
+        return true;
     }
 
     /**
@@ -73,21 +119,10 @@ public class StellarGravitonField {
      * prints to terminal
      * @param commands The commands to execute
      * @throws IOException InterruptedException If something went wrong
+     * @return Whether or not the operation timed out or not
      */
-    public static void processOP(boolean inheritIO, Path redirect, String... commands) throws IOException {
-        //Print out FFMPEG Command
-        String s = "";
-        for (String st : processOPBuilder(true, redirect, commands).command()) {
-            s += " " + st;
-        }
-        logger.info("COMMAND: " + s);
-        //Actually do it
-        Process proc = processOPBuilder(inheritIO, redirect, commands).start();
-        try {
-            proc.waitFor();
-        } catch (InterruptedException ex) {
-            Logger.getLogger(StellarGravitonField.class.getName()).log(Level.SEVERE, null, ex);
-        }
+    public static boolean processOP(boolean inheritIO, Path redirect, String... commands) throws IOException {
+        return processOP(inheritIO, redirect, null, commands);
     }
 
     /**
@@ -97,9 +132,34 @@ public class StellarGravitonField {
      * @param inheritIO Should the streams be merged
      * @param commands The commands to execute
      * @throws IOException InterruptedException If something went wrong
+     * @return Whether or not the operation timed out or not
      */
-    public static void processOP(boolean inheritIO, String... commands) throws IOException {
-        processOP(inheritIO, null, commands);
+    public static boolean processOP(boolean inheritIO, String... commands) throws IOException {
+        return processOP(inheritIO, null, commands);
+    }
+
+    /**
+     * Gets the process builder with the specified boolean indicating whether IO
+     * should be inherited or not, and the commands to execute. This process
+     * builder is localised at the temp directory.
+     *
+     * @param inheritIO If IO should be inherited
+     * @param redirect The path to direct output from the process to, if null,
+     * prints to terminal
+     * @param directory The directory that the process builder should be in
+     * @param commands The commands to execute
+     * @return The process builder with these properties
+     */
+    public static ProcessBuilder processOPBuilder(boolean inheritIO, Path redirect, Path directory, String... commands) {
+        ProcessBuilder builder = new ProcessBuilder(commands).directory(directory.toFile());
+        if (inheritIO) {
+            builder = builder.inheritIO();
+
+        }
+        if (redirect != null) {
+            builder = builder.redirectOutput(redirect.toFile());
+        }
+        return builder;
     }
 
     /**
@@ -114,18 +174,7 @@ public class StellarGravitonField {
      * @return The process builder with these properties
      */
     public static ProcessBuilder processOPBuilder(boolean inheritIO, Path redirect, String... commands) {
-        ProcessBuilder builder;
-        if (inheritIO) {
-            builder = new ProcessBuilder(commands)
-                    .directory(StellarDiskManager.getTempDirectory().toFile()).inheritIO();
-
-        } else {
-            builder = new ProcessBuilder(commands).directory(StellarDiskManager.getTempDirectory().toFile());
-        }
-        if (redirect != null) {
-            builder = builder.redirectOutput(redirect.toFile());
-        }
-        return builder;
+        return processOPBuilder(inheritIO, redirect, StellarDiskManager.getTempDirectory(), commands);
     }
 
     /**
@@ -173,6 +222,16 @@ public class StellarGravitonField {
     public static void toTypicalLoggerFormat(Logger logger, Handler handler) {
         handler.setFormatter(new StellarLoggingFormatter());
         logger.addHandler(handler);
+    }
+
+    /**
+     * Generates a new timestamp in our custom format which can be put as a
+     * filename.
+     *
+     * @return The timestamp
+     */
+    public static String generateTimestampFileNameFriendly() {
+        return LocalDateTime.now().format(FORMATTER).replaceAll("/", ".");
     }
 
     /**

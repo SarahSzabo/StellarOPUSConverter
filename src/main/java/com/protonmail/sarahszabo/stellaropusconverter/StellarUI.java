@@ -36,6 +36,32 @@ import org.controlsfx.control.Notifications;
  */
 public enum StellarUI {
     ;
+    public static enum EXTENSION_FILTER {
+        ALL {
+            @Override
+            public FileChooser.ExtensionFilter getFilter() {
+                return new FileChooser.ExtensionFilter("ALL Files", "*");
+            }
+        }, OPUS_FILES {
+            @Override
+            public FileChooser.ExtensionFilter getFilter() {
+                return new FileChooser.ExtensionFilter("OPUS Files", "*.opus");
+            }
+        }, PICTURE_FILES {
+            @Override
+            public FileChooser.ExtensionFilter getFilter() {
+                return new FileChooser.ExtensionFilter("Picture Files", "*.jpeg", "*.png");
+            }
+        };
+
+        /**
+         * Gets the file filter associated with this tag.
+         *
+         * @return
+         */
+        public abstract FileChooser.ExtensionFilter getFilter();
+    }
+
     private static final BlockingQueue<List<File>> FILE_LIST_QUEUE = new ArrayBlockingQueue<>(1);
     private static final BlockingQueue<File> FILE_QUEUE = new ArrayBlockingQueue<>(1);
     private static final BlockingQueue<Optional<String>> ASK_USER_METADATA = new ArrayBlockingQueue<>(1);
@@ -97,7 +123,7 @@ public enum StellarUI {
     public static Map<StellarOPUSConverter.MetadataType, String> askUserForArtistTitle(String fileName) {
         Platform.runLater(() -> {
             try {
-                TextInputDialog dialog = new TextInputDialog("");
+                TextInputDialog dialog = new TextInputDialog(" , " + fileName);
                 dialog.setTitle("Stellar: Enter Artist/Track Title");
                 dialog.setHeaderText((fileName != null ? ("(" + fileName + ")\n") : "")
                         + "Enter Author/Track Title Like So: Author, Title");
@@ -143,14 +169,19 @@ public enum StellarUI {
      * Gets a file from the disk.
      *
      * @param label The label to use for the chooser
+     * @param currentlySelected The currently selected filter
      * @return The path to the file on the disk
      */
-    public static Optional<Path> getFile(String label) {
+    public static Optional<Path> getFile(String label, EXTENSION_FILTER currentlySelected) {
         Platform.runLater(() -> {
             FileChooser chooser = new FileChooser();
-            chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("OPUS Files", "*.opus"));
-            chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("Picture Files", "*.jpeg", "*.png"));
+            //Add all extension filters
+            for (EXTENSION_FILTER filter : EXTENSION_FILTER.values()) {
+                FileChooser.ExtensionFilter extensionFilter = filter.getFilter();
+                chooser.getExtensionFilters().add(extensionFilter);
+            }
             chooser.setTitle("Stellar: " + label);
+            chooser.setSelectedExtensionFilter(currentlySelected.getFilter());
             File file = chooser.showOpenDialog(null);
             try {
                 FILE_QUEUE.put(file);
