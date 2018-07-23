@@ -122,7 +122,7 @@ public class StellarGravitonField {
      * @return Whether or not the operation timed out or not
      */
     public static boolean processOP(boolean inheritIO, Path redirect, String... commands) throws IOException {
-        return processOP(inheritIO, redirect, null, commands);
+        return processOP(inheritIO, redirect, StellarDiskManager.getTempDirectory(), commands);
     }
 
     /**

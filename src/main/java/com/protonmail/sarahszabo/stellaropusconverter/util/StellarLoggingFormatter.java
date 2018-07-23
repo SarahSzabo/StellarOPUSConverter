@@ -100,6 +100,31 @@ public final class StellarLoggingFormatter extends Formatter {
      * @return The modified logger in the proper format
      * @throws java.io.IOException If something went wrong
      */
+    public static <T> Logger forClass(T clazz, Path filePath) throws IOException {
+        return forTitle(clazz.getClass().getName(), filePath);
+    }
+
+    /**
+     * Creates a new logger for the specified class in the preferred logger
+     * format.
+     *
+     * @param clazz The class of the caller
+     * @return The modified logger in the proper format
+     * @throws java.io.IOException If something went wrong
+     */
+    public static <T> Logger forClass(T clazz) throws IOException {
+        return forTitle(clazz.getClass().getName());
+    }
+
+    /**
+     * Creates a new logger for the specified class in the preferred logger
+     * format. Writes the logs to the specified file path.
+     *
+     * @param clazz The class of the caller
+     * @param filePath The file path for the stream handler to write to the disk
+     * @return The modified logger in the proper format
+     * @throws java.io.IOException If something went wrong
+     */
     public static Logger forClass(Class<?> clazz, Path filePath) throws IOException {
         return forTitle(clazz.getName(), filePath);
     }

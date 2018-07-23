@@ -6,14 +6,14 @@
 package com.protonmail.sarahszabo.stellaropusconverter;
 
 import com.protonmail.sarahszabo.stellaropusconverter.util.StellarGravitonField;
-import static com.protonmail.sarahszabo.stellaropusconverter.util.StellarGravitonField.messageThenExit;
+import static com.protonmail.sarahszabo.stellaropusconverter.util.StellarGravitonField.*;
 import com.protonmail.sarahszabo.stellaropusconverter.util.StellarGreatFilter;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Arrays;
-import java.util.Map;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
@@ -22,6 +22,19 @@ import java.util.logging.Logger;
  * @author Sarah Szabo <PhysicistSarah@Gmail.com>
  */
 public class Main {
+
+    /**
+     * The version of the program.
+     */
+    public static final String VERSION = "1.4α";
+    /**
+     * The name of the program.
+     */
+    public static final String PROGRAM_NAME = "Stellar OPUS Conversion Library";
+    /**
+     * The full name and version number of the program.
+     */
+    public static final String FULL_PROGRAM_NAME = PROGRAM_NAME + " " + VERSION;
 
     /**
      * @param args the command line arguments
@@ -60,9 +73,14 @@ public class Main {
                 printHelp();
             }
         } else if (args.length == 2) {
-            //-CL With All Same Artist
             if (args[0].equalsIgnoreCase("-CL")) {
-                stellarConversion(StellarMode.CLIPBOARD_SAME_ARTIST, args);
+                //Set All Files  With the Same Picture
+                if (args[1].equalsIgnoreCase("Picture-Select")) {
+                    stellarConversion(StellarMode.PICTURE_SELECT, args);
+                } //-CL With All Same Artist
+                else {
+                    stellarConversion(StellarMode.CLIPBOARD_SAME_ARTIST, args);
+                }
             }//Change Settings
             else if (args[0].equalsIgnoreCase("Set")) {
                 if (args[1].equalsIgnoreCase("Pictures-Folder")) {
@@ -81,21 +99,27 @@ public class Main {
                     StellarDiskManager.setSpaceBridgeDirectory(path);
                     messageThenExit("Space-Bridge Folder Changed To: " + path);
                 } //Set Picture Metadata
-                if (args[1].equalsIgnoreCase("AlbumArt")) {
+                if (args[1].equalsIgnoreCase("Album-Art")) {
                     Path opusFile = StellarUI.getFilesFromClipboard().get(0), imageFile = StellarUI.getFile("Select an Image File",
-                            StellarUI.EXTENSION_FILTER.PICTURE_FILES).orElseThrow(()
-                                    -> new RuntimeException("User did not choose an image, aborting"));
+                            StellarUI.EXTENSION_FILTER.PICTURE_FILES).orElseGet(() -> {
+                                try {
+                                    return StellarDiskManager.getGenericPicture();
+                                } catch (IOException ex) {
+                                    Logger.getLogger(Main.class.getName()).log(Level.SEVERE, null, ex);
+                                    throw new RuntimeException("No Random Picture Available, Check the Configuration Folder");
+                                }
+                            });
                     if (opusFile == null || imageFile == null) {
                         throw new IllegalStateException("Attempt to set album art with null clipboard opus file or null image selected");
                     }
                     //Get metadata from file
-                    Map<StellarOPUSConverter.MetadataType, String> metadata
-                            = StellarDiskManager.getMetadata(opusFile);
+                    StellarOPUSConverter.ConverterMetadataBuilder metadata
+                            = new StellarOPUSConverter.ConverterMetadataBuilder(StellarDiskManager.getMetadata(opusFile));
                     //Set to new image
-                    metadata.put(StellarOPUSConverter.MetadataType.ALBUM_ART, imageFile.toAbsolutePath().toString());
+                    metadata.albumArtPath(imageFile);
                     //Map new metadata to opus file
                     StellarOPUSConverter converter = new StellarOPUSConverter(StellarGravitonField.newPath(opusFile),
-                            StellarDiskManager.getOutputFolder(), Logger.getLogger(StellarOPUSConverter.class.getName()), metadata);
+                            StellarDiskManager.getOutputFolder(), Logger.getLogger(StellarOPUSConverter.class.getName()), metadata.buildMetadata());
                     converter.reIndexOPUSFile();
 
                 }

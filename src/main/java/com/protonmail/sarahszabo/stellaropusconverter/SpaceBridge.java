@@ -232,12 +232,23 @@ public enum SpaceBridge {
      *
      * @param path The path to investigate
      * @return Whether or not this is true
-     * @throws IOException If something went wron
      */
-    private boolean filterByFileName(Path path) throws IOException {
+    private boolean filterByFileNameExistance(Path path) {
+        return existInSpaceBridge(path, reIndexingFolder);
+    }
+
+    /**
+     * Checks a path to see if its metadata attribute title matches the
+     * space-bridge title.
+     *
+     * @param path The path to investigate
+     * @return Whether or not this is true
+     * @throws IOException If something went wrong
+     */
+    private boolean filterByFileNamePattern(Path path) {
         //Or could exist in the filename metadata format itself
         return existInSpaceBridge(newPath(path.getParent(),
-                StellarOPUSConverter.generateMetadata(path).get(StellarOPUSConverter.MetadataType.TITLE) + ".opus"),
+                StellarOPUSConverter.generateMetadata(path).getTitle() + ".opus"),
                 reIndexingFolder);
     }
 
@@ -247,12 +258,18 @@ public enum SpaceBridge {
      *
      * @param path The path to investigate
      * @return Whether or not this is true
-     * @throws IOException If something went wron
+     * @throws IOException If something went wrong
      */
-    private boolean filterByFileAttributes(Path path) throws IOException {
-        //Could be Author - Title or have title field set in metadata attribute fields
-        return existInSpaceBridge(newPath(path.getParent(),
-                StellarDiskManager.getMetadata(path).get(StellarOPUSConverter.MetadataType.TITLE) + ".opus"), reIndexingFolder);
+    private boolean filterByFileAttributes(Path path) {
+        try {
+            //Could be Author - Title or have title field set in metadata attribute fields
+            return existInSpaceBridge(newPath(path.getParent(),
+                    StellarDiskManager.getMetadata(path).getTitle() + ".opus"), reIndexingFolder);
+        } catch (IOException ex) {
+            Logger.getLogger(SpaceBridge.class.getName()).log(Level.SEVERE, null, ex);
+            SB_EXCEPTION_LOGGER.log(Level.SEVERE, null, ex);
+            throw new RuntimeException(ex);
+        }
     }
 
     /**
@@ -267,16 +284,10 @@ public enum SpaceBridge {
         //Mirror Directories, We'll do this in the ReIndexing Folder
         mirrorDirectories(reIndexingFolder);
         //Reindex All Files & Put them in the ReIndexing Folder
-        fileWalkFilterDuplicatesOnlyFiles(reIndexingFolder).filter(path -> {
-            try {
-                //If either one exists in space-bridge folder, the overall statement is false, do not convert this file
-                return !(filterByFileAttributes(path) || filterByFileName(path) || existInSpaceBridge(path, reIndexingFolder));
-            } catch (IOException ex) {
-                SB_EXCEPTION_LOGGER.log(Level.SEVERE, null, ex);
-                throw new RuntimeException(ex);
-            }
-        })
-                .forEachOrdered(path -> {
+        //If either one exists in space-bridge folder, the overall statement is false, do not convert this file
+        fileWalkFilterDuplicatesOnlyFiles(reIndexingFolder).filter(path
+                -> !(filterByFileNameExistance(path) || filterByFileAttributes(path) || filterByFileNamePattern(path)))
+                .forEach(path -> {
                     Future<Path> future = StellarHyperspace.getHyperspace().submit(() -> {
                         try {
                             StellarOPUSConverter converter = new StellarOPUSConverter(path, getCopyPath(path, reIndexingFolder).getParent());

@@ -19,8 +19,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
+import java.time.LocalDate;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import java.util.Random;
 import java.util.logging.Level;
@@ -86,7 +86,7 @@ public enum StellarDiskManager {
      * @param partialMetadata The partial (Only artist/title) metadata
      * @return The picture file generated
      */
-    private static Path generateImagefromFile(Path path, Map<StellarOPUSConverter.MetadataType, String> partialMetadata) throws IOException {
+    private static Path generateImagefromFile(Path path) throws IOException {
         //Decompose Picture Stored as Binary File
         String noExtension = StellarOPUSConverter.stripFileExtension(path);
         Path imageFile = newPath(REINDEXING_FOLDER, noExtension + ".png");
@@ -101,7 +101,7 @@ public enum StellarDiskManager {
      * @return The metadata of the opus file
      * @throws java.io.IOException If something went wrong
      */
-    public static Map<StellarOPUSConverter.MetadataType, String> getMetadata(Path path) throws IOException {
+    public static StellarOPUSConverter.ConverterMetadata getMetadata(Path path) throws IOException {
         Path metadataFilePath = newPath(REINDEXING_FOLDER, StellarOPUSConverter.stripFileExtension(path) + ".txt");
         //Import .Opus File to ReIndexing Directory, Use Reindexing folder to avoid name clashes
         Path reindexingOpusFile = newPath(REINDEXING_FOLDER, path.getFileName());
@@ -111,34 +111,44 @@ public enum StellarDiskManager {
         processOP(true, metadataFilePath, REINDEXING_FOLDER, "exiftool", path.getFileName().toString());
         //Trim Entries from exiftool
         List<String> lines = Files.readAllLines(metadataFilePath).stream().collect(Collectors.toList());
-        Map<StellarOPUSConverter.MetadataType, String> metadata = StellarOPUSConverter.getDefaultMetadata();
+        StellarOPUSConverter.ConverterMetadataBuilder metadata
+                = new StellarOPUSConverter.ConverterMetadataBuilder(StellarOPUSConverter.getDefaultMetadata());
         for (String str : lines) {
             String contents = str.split(":")[0];
             if (contents.matches("Artist\\s+")) {
                 //Data is always after the : character
                 String artist = preferredTitleFormat(str.split(":")[1].trim());
                 //Map Behaviour overwrites existing entry
-                metadata.put(StellarOPUSConverter.MetadataType.ARTIST, artist);
+                metadata.artist(artist);
             } else if (contents.matches("Title\\s+")) {
                 //Data is always after the : character
                 String title = preferredTitleFormat(str.split(":")[1].trim());
                 //Map Behaviour overwrites existing entry
-                metadata.put(StellarOPUSConverter.MetadataType.TITLE, title);
+                metadata.title(title);
             } else if (contents.matches("Picture\\s+")) {
-                Path picturePath = generateImagefromFile(path, metadata);
+                Path picturePath = generateImagefromFile(path);
                 //Attempt Picture Reconstruction
                 //If the picture file is less than 100 bytes, there was no image data in the .opus file, we'll have to ask the user for it
                 if (Files.size(picturePath) < 100) {
                     //Put default metadata into metadata map
-                    metadata.put(StellarOPUSConverter.MetadataType.ALBUM_ART,
-                            StellarOPUSConverter.getDefaultMetadata().get(StellarOPUSConverter.MetadataType.ALBUM_ART));
+                    metadata.albumArtPath(StellarOPUSConverter.getDefaultMetadata().getAlbumArtPath());
                 } else {
                     //Get Picture File Path & Insert into Map
-                    metadata.put(StellarOPUSConverter.MetadataType.ALBUM_ART, picturePath.toAbsolutePath().toString());
+                    metadata.albumArtPath(picturePath);
                 }
+            } else if (contents.matches("Date\\s+")) {
+                //Data is always after the : character
+                String date = preferredTitleFormat(str.split(":")[1].trim());
+                //Map Behaviour overwrites existing entry
+                metadata.date(LocalDate.parse(date, StellarOPUSConverter.DATE_FORMATTER));
+            } else if (contents.matches(StellarOPUSConverter.CREATED_BY_TAG + "\\s+")) {
+                //Data is always after the : character
+                String comment = preferredTitleFormat(str.split(":")[1].trim());
+                //Map Behaviour overwrites existing entry
+                metadata.createdBy(comment);
             }
         }
-        return metadata;
+        return metadata.buildMetadata();
     }
 
     /**

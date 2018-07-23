@@ -5,6 +5,7 @@
  */
 package com.protonmail.sarahszabo.stellaropusconverter;
 
+import com.protonmail.sarahszabo.stellaropusconverter.util.StellarLoggingFormatter;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -28,6 +29,40 @@ import javafx.application.Platform;
  */
 public enum StellarMode {
 
+    /**
+     * Selects a file, and uses that file for pictures for the rest of the
+     * files.
+     */
+    PICTURE_SELECT {
+        @Override
+        public void start(String... args) throws IOException {
+            //Get From Clipboard
+            List<Path> paths = new ArrayList<>(StellarUI.getFilesFromClipboard());
+            //Select File From List
+            Path selected = StellarUI.selectPath(paths).orElseThrow(() -> new RuntimeException("Nothing Selected from path chooser!"));
+            //Remove Video Entry from Paths
+            paths.remove(selected);
+            //Convert Selected File Using Converter Methods to Generate Metadata for it, even if it is an .MP4
+            StellarOPUSConverter metadataConverter = new StellarOPUSConverter(selected, StellarDiskManager.getTempDirectory());
+            Path metaDataOpusFile = metadataConverter.convertToOPUS().get();
+            //Get Old Metadata, If it Exists
+            StellarOPUSConverter.ConverterMetadata newMetadata = StellarDiskManager.getMetadata(metaDataOpusFile);
+            if (StellarOPUSConverter.isDefaultMetadata(StellarOPUSConverter.MetadataType.ALBUM_ART, newMetadata)) {
+                throw new RuntimeException("There is no Album Art Available for: " + selected);
+            }
+            for (Path path : paths) {
+                //Get Old Metadata for our Files
+                StellarOPUSConverter.ConverterMetadataBuilder oldOpusMetadata
+                        = new StellarOPUSConverter.ConverterMetadataBuilder(StellarDiskManager.getMetadata(path));
+                //Set With new Album Art
+                oldOpusMetadata.albumArtPath(newMetadata.getAlbumArtPath());
+                StellarOPUSConverter converter = new StellarOPUSConverter(path, oldOpusMetadata.buildMetadata());
+                converter.convertToOPUS();
+            }
+            logger.info(paths.stream().map(path -> path.toAbsolutePath().toString()).collect(Collectors.joining(", ")) + " album art have been"
+                    + "switched to " + selected.toAbsolutePath() + "'s album art");
+        }
+    },
     /**
      * Used when we are interested in converting to the 120k format for our
      * mobile phones.
@@ -151,7 +186,10 @@ public enum StellarMode {
         }
     };
 
-    private static Logger logger = Logger.getLogger(StellarMode.class.getName());
+    /**
+     * The logger for stellar mode.
+     */
+    private static Logger logger = StellarLoggingFormatter.forClass(StellarMode.class);
 
     public abstract void start(String... args) throws IOException;
 

@@ -13,6 +13,7 @@ Special File Options (Note: Use These Just By Themselves, Ex: -CL):
 -G = Graphical File Chooser
 -CL = Copy the Selected Files From The Clipboard
 -CL "Artist" = All Files in Clipboard Share this Artist, No Prompts Required
+-CL Picture-Select = Copy All Files, Including the video from which you want to rip the picture from, then rips the picture from the video you select and uses this picture for the album art.
 
 Alternate Modes:
 Space-Bridge = Enables the Space-Bridge Mobile Conversion Functionality. This watches a certain directory and all sub-directories
@@ -30,7 +31,7 @@ Set Space-Bridge-Folder = Change the Space=Bridge Watch Folder
 Status = Print Current Status (Folder Locations)
 
 Metadata Settings:
-Set AlbumArt = Sets the opus file on the clipboard with the picture file from a file chooser
+Set Album-Art = Sets the opus file on the clipboard with the picture file from a file chooser, or a random picture if you cancel.
 
 Currently Supported Formats: .MP4, .MP3, .OPUS
 Note: .OPUS -> .OPUS conversions are possible, the metadata will be copied over once you set it, per the usual conversion process.
