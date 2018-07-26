@@ -13,15 +13,19 @@ import java.nio.file.FileVisitOption;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.time.LocalDate;
+import java.util.List;
 import java.util.concurrent.Future;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.commons.io.FileUtils;
 
 /**
  * A class that oversees conversions in a certain folder and converts them to
- * 120K mobile formats.
+ * 190K mobile formats or 320K for typical libraries, also manages temporal
+ * playlists.
  *
  * @author Sarah Szabo <SarahSzabo@Protonmail.com>
  */
@@ -47,6 +51,28 @@ public enum SpaceBridge {
      * folder.
      */
     private static final Path reIndexingFolder;
+
+    private static final Path PLAYLISTS_FOLDER;
+    /**
+     * The playlist folder for files created in the last week.
+     */
+    private static final Path ONE_WEEK_PLAYLIST;
+    /**
+     * The playlist folder for files created in the last 2 weeks.
+     */
+    private static final Path TWO_WEEK_PLAYLIST;
+    /**
+     * The playlist folder for files created in the last month.
+     */
+    private static final Path ONE_MONTH_PLAYLIST;
+    /**
+     * The playlist folder for files created in the last 2 months.
+     */
+    private static final Path TWO_MONTH_PLAYLIST;
+    /**
+     * The playlist folder for files created in the last six months.
+     */
+    private static final Path SIX_MONTH_PLAYLIST;
     /**
      * The default console logger for space-bridge operations.
      */
@@ -79,7 +105,19 @@ public enum SpaceBridge {
             completed = newPath(watching, "Space-Bridge Completed");
             SB_EXCEPTION_LOGGER = StellarLoggingFormatter.forTitle("Space-Bridge", EXCEPTION_LOG_PATH);
             reIndexingFolder = newPath(StellarDiskManager.getState().getSpaceBridgeDirectory(), "Space-Bridge ReIndexing");
+            PLAYLISTS_FOLDER = newPath(reIndexingFolder, "Playlists");
+            ONE_WEEK_PLAYLIST = newPath(PLAYLISTS_FOLDER, PLAYLIST.ONE_WEEK.toString());
+            TWO_WEEK_PLAYLIST = newPath(PLAYLISTS_FOLDER, PLAYLIST.TWO_WEEKS.toString());
+            ONE_MONTH_PLAYLIST = newPath(PLAYLISTS_FOLDER, PLAYLIST.ONE_MONTH.toString());
+            TWO_MONTH_PLAYLIST = newPath(PLAYLISTS_FOLDER, PLAYLIST.TWO_MONTHS.toString());
+            SIX_MONTH_PLAYLIST = newPath(PLAYLISTS_FOLDER, PLAYLIST.SIX_MONTHS.toString());
             Files.createDirectories(reIndexingFolder);
+            Files.createDirectories(PLAYLISTS_FOLDER);
+            Files.createDirectories(ONE_WEEK_PLAYLIST);
+            Files.createDirectories(TWO_WEEK_PLAYLIST);
+            Files.createDirectories(ONE_MONTH_PLAYLIST);
+            Files.createDirectories(TWO_MONTH_PLAYLIST);
+            Files.createDirectories(SIX_MONTH_PLAYLIST);
             logger.log(Level.INFO, "Space-Bridge Initial Setup Complete!");
             Runtime.getRuntime().addShutdownHook(new Thread(() -> {
                 try {
@@ -166,7 +204,7 @@ public enum SpaceBridge {
      */
     private void mirrorDirectories(Path outputFolder) throws IOException {
         //Mirror Directories
-        fileWalkFilterDuplicates(outputFolder).filter(path -> Files.isDirectory(path)).forEachOrdered(folder -> {
+        fileWalkFilterDuplicates(outputFolder).filter(path -> Files.isDirectory(path)).forEach(folder -> {
             try {
                 Path folderPath = getCopyPath(folder, reIndexingFolder);
                 Files.createDirectories(folderPath);
@@ -199,7 +237,7 @@ public enum SpaceBridge {
         //No Directories, File Must be newPath expected file type, File Should Not Already Be Indexed
         fileWalkFilterDuplicatesOnlyFiles(completed).filter(path -> stringContains(path.getFileName().toString(), ".opus",
                 ".mp3", ".ogg") && existInSpaceBridge(path, completed))
-                .forEachOrdered(file -> {
+                .forEach(file -> {
                     Future<Path> future = StellarHyperspace.getHyperspace().submit(() -> {
                         //Doesn't Exist in Destination, Convert to 120K
                         StellarOPUSConverter converter = new StellarOPUSConverter(file, getCopyPath(file, completed).getParent());
@@ -265,7 +303,7 @@ public enum SpaceBridge {
             //Could be Author - Title or have title field set in metadata attribute fields
             return existInSpaceBridge(newPath(path.getParent(),
                     StellarDiskManager.getMetadata(path).getTitle() + ".opus"), reIndexingFolder);
-        } catch (IOException ex) {
+        } catch (RuntimeException ex) {
             Logger.getLogger(SpaceBridge.class.getName()).log(Level.SEVERE, null, ex);
             SB_EXCEPTION_LOGGER.log(Level.SEVERE, null, ex);
             throw new RuntimeException(ex);
@@ -275,18 +313,20 @@ public enum SpaceBridge {
     /**
      * Initiates the ReIndexing bridge which uses
      * {@link StellarOPUSConverter#reIndexOPUSFile()} to apply the latest
-     * version of conversion to older .opus libraries.
+     * version of conversion options to older .opus libraries.
      *
      * @param bitrate The bitrate for the converted files
      * @throws java.io.IOException If something went wrong
      */
     public void initReIndexingBridge(int bitrate) throws IOException {
+        logger.info("About to Mirror Directories");
         //Mirror Directories, We'll do this in the ReIndexing Folder
         mirrorDirectories(reIndexingFolder);
+        logger.info("Dirctory Mirroring Complete!");
         //Reindex All Files & Put them in the ReIndexing Folder
         //If either one exists in space-bridge folder, the overall statement is false, do not convert this file
         fileWalkFilterDuplicatesOnlyFiles(reIndexingFolder).filter(path
-                -> !(filterByFileNameExistance(path) || filterByFileAttributes(path) || filterByFileNamePattern(path)))
+                -> !(filterByFileNameExistance(path) || filterByFileNamePattern(path)))
                 .forEach(path -> {
                     Future<Path> future = StellarHyperspace.getHyperspace().submit(() -> {
                         try {
@@ -309,7 +349,230 @@ public enum SpaceBridge {
                         }
                     });
                 });
+        logger.info("About to Generate Temporal Playlists");
+        //Init Playlists
+        generateTemporalPlaylists();
+        logger.info("Temporal Playlist Generation Complete!");
         //All work completed
+        logger.info("Shutting Down ReIndexing Bridge");
         shutdownBridge();
+        logger.info("Shutdown Complete!");
+    }
+
+    /**
+     * Generates all temporal playlists. Temporal playlists are playlists that
+     * contain files from the library that were created in a certain time
+     * period. Folders must be set up/exist prior to calling this subroutine.
+     */
+    private static void generateTemporalPlaylists() throws IOException {
+        //Folders Are Already Set Up
+        List<PlaylistPathWrapper> wrappers = Files.walk(reIndexingFolder, FileVisitOption.FOLLOW_LINKS).parallel()
+                //Convert to Wrapper to Optimise Performance
+                .map(path -> new PlaylistPathWrapper(path, StellarDiskManager.getMetadata(path))).collect(Collectors.toList()),
+                //Filter by 6 months (Max playlist time currently) & Isn't in the Playlists Folder & Isn't a Directory
+                filteredByMaxTime = wrappers.stream().parallel()
+                        .filter(wrapper -> !wrapper.getPath().startsWith(PLAYLISTS_FOLDER) && !Files.isDirectory(wrapper.getPath())
+                        && PLAYLIST.SIX_MONTHS.isInCurrentDateRange(wrapper.getMetadata().getDate())).collect(Collectors.toList());
+        //Remove Old Entries Before Adding New Ones
+        //Traditional For Each for Added Performance Gain
+        for (PLAYLIST playlist : PLAYLIST.values()) {
+            //For Each Playlist, Remove Old Entries on the Disk
+            //Playlist Folder Just Contain Files & No Other Folders
+            Files.walk(playlist.getPath(), FileVisitOption.FOLLOW_LINKS).parallel()
+                    //Map to wrapper
+                    .map(path -> new PlaylistPathWrapper(path, StellarDiskManager.getMetadata(path)))
+                    //Filter by files NOT in the current range
+                    .filter(wrapper -> !playlist.isInCurrentDateRange(wrapper))
+                    //Delete These Files
+                    .map(PlaylistPathWrapper::getPath).map(Path::toFile).forEach(FileUtils::deleteQuietly);
+        }
+        //Traditional For Each for Added Performance Gain
+        for (PLAYLIST playlist : PLAYLIST.values()) {
+            //Filter By Every Playlists Requirements
+            filteredByMaxTime.stream().parallel().filter(wrapper -> playlist.isInCurrentDateRange(wrapper.getMetadata().getDate()))
+                    //Copy the Files Into the Playlists
+                    .forEach(wrapper -> {
+                        try {
+                            Path destination = playlist.getPath().resolve(wrapper.getPath().getFileName());
+                            Files.copy(wrapper.getPath(), destination, StandardCopyOption.COPY_ATTRIBUTES,
+                                    StandardCopyOption.REPLACE_EXISTING);
+                            logger.info("Copied " + wrapper.getPath() + " ->" + destination);
+                        } catch (IOException ex) {
+                            Logger.getLogger(SpaceBridge.class.getName()).log(Level.SEVERE, null, ex);
+                            SpaceBridge.SB_EXCEPTION_LOGGER.severe("Exception when trying to copy " + wrapper.getPath() + " to the disk"
+                                    + "\n\n" + ex);
+                        }
+                    });
+        }
+    }
+
+    /**
+     * A wrapper class for optimising performance of the generate playlists
+     * subroutine.
+     */
+    private static class PlaylistPathWrapper {
+
+        private final Path path;
+        private final StellarOPUSConverter.ConverterMetadata metadata;
+
+        /**
+         * Constructor for the wrapper
+         *
+         * @param path The path of the file
+         * @param date The date the file was created
+         */
+        PlaylistPathWrapper(Path path, StellarOPUSConverter.ConverterMetadata metadata) {
+            this.path = path;
+            this.metadata = metadata;
+        }
+
+        /**
+         * A getter for the path
+         *
+         * @return The path
+         */
+        public Path getPath() {
+            return this.path;
+        }
+
+        /**
+         * A getter for the metadata.
+         *
+         * @return The metadata
+         */
+        public StellarOPUSConverter.ConverterMetadata getMetadata() {
+            return this.metadata;
+        }
+    }
+
+    /**
+     * A class representing temporal playlists.
+     */
+    private static enum PLAYLIST {
+        /**
+         * The playlist for 1 week.
+         */
+        ONE_WEEK {
+            @Override
+            public boolean isInCurrentDateRange(LocalDate date) {
+                return date.isAfter(LocalDate.now().minusWeeks(1));
+            }
+
+            @Override
+            public String toString() {
+                return "1 Week";
+            }
+
+            @Override
+            public Path getPath() {
+                return ONE_WEEK_PLAYLIST;
+            }
+        },
+        /**
+         * The playlist for 2 weeks.
+         */
+        TWO_WEEKS {
+            @Override
+            public boolean isInCurrentDateRange(LocalDate date) {
+                return date.isAfter(LocalDate.now().minusWeeks(2));
+            }
+
+            @Override
+            public String toString() {
+                return "2 Weeks";
+            }
+
+            @Override
+            public Path getPath() {
+                return TWO_WEEK_PLAYLIST;
+            }
+        },
+        /**
+         * The playlist for 1 month.
+         */
+        ONE_MONTH {
+            @Override
+            public boolean isInCurrentDateRange(LocalDate date) {
+                return date.isAfter(LocalDate.now().minusMonths(1));
+            }
+
+            @Override
+            public String toString() {
+                return "1 Month";
+            }
+
+            @Override
+            public Path getPath() {
+                return ONE_MONTH_PLAYLIST;
+            }
+        },
+        /**
+         * The playlist for 2 months.
+         */
+        TWO_MONTHS {
+            @Override
+            public boolean isInCurrentDateRange(LocalDate date) {
+                return date.isAfter(LocalDate.now().minusMonths(2));
+            }
+
+            @Override
+            public String toString() {
+                return "2 Months";
+            }
+
+            @Override
+            public Path getPath() {
+                return TWO_MONTH_PLAYLIST;
+            }
+        },
+        /**
+         * The playlist for 6 months.
+         */
+        SIX_MONTHS {
+            @Override
+            public boolean isInCurrentDateRange(LocalDate date) {
+                return date.isAfter(LocalDate.now().minusMonths(6));
+            }
+
+            @Override
+            public String toString() {
+                return "6 Months";
+            }
+
+            @Override
+            public Path getPath() {
+                return SIX_MONTH_PLAYLIST;
+            }
+        };
+
+        /**
+         * Gets the path associated with this playlist.
+         *
+         * @return The path to the folder of this playlist
+         */
+        public abstract Path getPath();
+
+        /**
+         * Gets whether or not the current date is in range of the time
+         * interval. Ex: are we within 1 week of the created date?
+         *
+         * @param wrapper The wrapper containing the date
+         * @return Whether or not this is true
+         */
+        public boolean isInCurrentDateRange(PlaylistPathWrapper wrapper) {
+            return isInCurrentDateRange(wrapper.getMetadata().getDate());
+        }
+
+        /**
+         * Gets whether or not the current date is in range of the time
+         * interval. Ex: are we within 1 week of the created date?
+         *
+         * @param date The date to compare against
+         * @return Whether or not this is true
+         */
+        public abstract boolean isInCurrentDateRange(LocalDate date);
+
+        @Override
+        public abstract String toString();
     }
 }
