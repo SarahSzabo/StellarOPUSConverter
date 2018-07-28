@@ -46,7 +46,7 @@ public enum StellarMode {
             StellarOPUSConverter metadataConverter = new StellarOPUSConverter(selected, StellarDiskManager.getTempDirectory());
             Path metaDataOpusFile = metadataConverter.convertToOPUS().get();
             //Get Old Metadata, If it Exists
-            StellarOPUSConverter.ConverterMetadata newMetadata = StellarDiskManager.getMetadata(metaDataOpusFile);
+            ConverterMetadata newMetadata = StellarDiskManager.getMetadata(metaDataOpusFile);
             if (StellarOPUSConverter.isDefaultMetadata(StellarOPUSConverter.MetadataType.ALBUM_ART, newMetadata)) {
                 throw new RuntimeException("There is no Album Art Available for: " + selected);
             }

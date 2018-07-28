@@ -29,7 +29,7 @@ public class StellarHyperspace {
     /**
      * Tasks executed in hyperspace.
      */
-    private static final ExecutorService hyperspace = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors() + 1,
+    private static final ExecutorService hyperspace = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors() + 2,
             new ThreadFactory() {
         private int threadCount = 0;
 

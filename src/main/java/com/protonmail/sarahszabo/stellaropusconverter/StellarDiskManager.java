@@ -101,7 +101,7 @@ public enum StellarDiskManager {
      * @return The metadata of the opus file
      * @throws RuntimeException If something went wrong in I/O
      */
-    public static StellarOPUSConverter.ConverterMetadata getMetadata(Path path) {
+    public static ConverterMetadata getMetadata(Path path) {
         try {
             Path metadataFilePath = newPath(REINDEXING_FOLDER, StellarOPUSConverter.stripFileExtension(path) + ".txt");
             //Import .Opus File to ReIndexing Directory, Use Reindexing folder to avoid name clashes
@@ -148,6 +148,11 @@ public enum StellarDiskManager {
                     String comment = preferredTitleFormat(str.split(":")[1].trim());
                     //Map Behaviour overwrites existing entry
                     metadata.createdBy(comment);
+                } else if (contents.matches("Encoder Options\\s+")) {
+                    //Data is always after the : character
+                    int bitrate = Integer.parseInt(str.split("--bitrate ")[1].replace('k', ' ').trim());
+                    //Map Behaviour overwrites existing entry
+                    metadata.bitrate(bitrate);
                 }
             }
             return metadata.buildMetadata();
