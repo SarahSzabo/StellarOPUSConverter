@@ -41,6 +41,8 @@ public class Main {
      * @throws java.io.IOException If something went wrong
      */
     public static void main(String[] args) throws IOException {
+        StellarUI.getFiles();
+        System.exit(0);
         //We have to check greater than section first, then we check integer comparison
         //Odd Number of Entries >= 3 (URL, timestamp0 timestamp1 timestamp2 timestamp3
         if (args.length >= 3 && argIsLink(args[0]) && (args.length + 1) % 2 == 0

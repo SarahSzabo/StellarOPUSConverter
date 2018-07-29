@@ -57,7 +57,19 @@ public enum StellarDiskManager {
      */
     public static final Path HELP_TEXT_PATH = Paths.get(CONFIGURATION_FOLDER.toString(), "Help Text.dat");
 
+    /**
+     * The path to the default pictures folder.
+     */
     public static final Path DEFAULT_PICTURES = newPath(CONFIGURATION_FOLDER, "Default Pictures");
+    /**
+     * The folder for system pictures.
+     */
+    public static final Path SYSTEM_PICTURES = CONFIGURATION_FOLDER.resolve("System Pictures");
+
+    /**
+     * Stellar's Icon.
+     */
+    public static final Path SYSTEM_ICON = SYSTEM_PICTURES.resolve("Stellar Icon.png");
     /**
      * The default object mapper for this application.
      */

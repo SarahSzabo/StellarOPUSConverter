@@ -6,9 +6,12 @@
 package com.protonmail.sarahszabo.stellaropusconverter;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
-import com.fasterxml.jackson.annotation.JsonTypeInfo;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import com.fasterxml.jackson.module.paramnames.ParameterNamesModule;
 import com.protonmail.sarahszabo.stellaropusconverter.util.StellarGravitonField;
 import static com.protonmail.sarahszabo.stellaropusconverter.util.StellarGravitonField.*;
 import com.protonmail.sarahszabo.stellaropusconverter.util.StellarLoggingFormatter;
@@ -18,6 +21,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.Future;
@@ -66,6 +71,10 @@ public enum SpaceBridge {
      */
     private static final Path reIndexingFolder;
     /**
+     * The ledger used for new additions
+     */
+    private static final List<SBDatapacket> LEDGER = new ArrayList<>(1500);
+    /**
      * The filename and extension of the playlist ledger.
      */
     private static final String LEDGER_FILENAME = "Playlist Ledger.dat";
@@ -99,6 +108,9 @@ public enum SpaceBridge {
      */
     static {
         try {
+            MAPPER.registerModule(new ParameterNamesModule());
+            MAPPER.registerModule(new Jdk8Module());
+            MAPPER.registerModule(new JavaTimeModule()); // new module, NOT JSR310Module
             StellarDiskManager.DiskManagerState state = StellarDiskManager.getState();
             //The directory we're watching
             watching = state.getSpaceBridgeDirectory();
@@ -218,13 +230,6 @@ public enum SpaceBridge {
         logger.log(Level.INFO, "\n\nAbout to Mirror Directories");
         mirrorDirectories(COMPLETED320K);
         mirrorDirectories(COMPLETED190K);
-        //Purge Non .opus files in the space-bridge directory
-        logger.log(Level.INFO, "About to scan for non .opus files");
-        Files.walk(COMPLETED, FileVisitOption.FOLLOW_LINKS).filter(path -> !Files.isDirectory(path)
-                && !path.getFileName().toString().contains(".opus")).forEach(path -> {
-            FileUtils.deleteQuietly(path.toFile());
-            logger.log(Level.INFO, "{0} deleted", path);
-        });
         logger.log(Level.INFO, "\n\nDirectory Mirroring Process Complete");
         logger.log(Level.INFO, "\n\nAbout to Mirror And Convert Files to lower bitrate");
         //Check if Converted Files Exist Already, if Not Convert Them
@@ -238,10 +243,12 @@ public enum SpaceBridge {
                             Path destination = getCopyPath(filePath, COMPLETED320K).getParent();
                             StellarOPUSConverter converter = new StellarOPUSConverter(filePath, destination);
                             Path path = converter.convertToOPUS().orElseThrow(() -> new IOException("Error in Processing <320K>" + filePath));
+                            LEDGER.add(new SBDatapacket(path));
                             logger.log(Level.INFO, "\nFile Convertion Complete <320K>: " + path + "\n");
                             destination = getCopyPath(filePath, COMPLETED190K).getParent();
                             converter = new StellarOPUSConverter(filePath, destination, converter.getMetadata());
                             path = converter.convertToOPUS(190).orElseThrow(() -> new IOException("Error in Processing <190K>" + filePath));
+                            LEDGER.add(new SBDatapacket(path));
                             logger.log(Level.INFO, "\nFile Convertion Complete <190K>: " + path + "\n");
                             return path;
                         } catch (IOException ex) {
@@ -401,15 +408,21 @@ public enum SpaceBridge {
                 });
             } else {
                 logger.info("No ledger found for " + ledgerPath + "\nCreating a New One");
-                //No Previous Ledger, Generate New Ledger
-                ledger = Files.walk(root, FileVisitOption.FOLLOW_LINKS).parallel()
-                        .filter(path -> !path.startsWith(playlistFolder) && !Files.isDirectory(path)).map(SBDatapacket::new)
-                        .collect(Collectors.toList());
+                //If the folder is empty, all entries are in LEDGER, no need to exiftool entire directory
+                if (Files.list(currentPlaylistFolder).count() == 0) {
+                    ledger = Collections.emptyList();
+                } else {
+                    //There Were Previous Entries, Generate New Ledger
+                    ledger = Files.walk(root, FileVisitOption.FOLLOW_LINKS).parallel()
+                            .filter(path -> !path.startsWith(playlistFolder) && !Files.isDirectory(path)).map(SBDatapacket::new)
+                            .collect(Collectors.toList());
+                }
                 //Make Ledger
                 Files.createFile(ledgerPath);
             }
+            List<SBDatapacket> combined = Stream.concat(LEDGER.stream(), ledger.stream()).collect(Collectors.toList());
             //Copy Current Entries to Current Playlist
-            ledger.parallelStream().filter(data -> !Files.isDirectory(data.getPath())
+            combined.stream().filter(data -> !Files.isDirectory(data.getPath())
                     && playlist.isInCurrentDateRange(data)).map(SBDatapacket::getPath)
                     .forEach(path -> {
                         try {
@@ -424,14 +437,12 @@ public enum SpaceBridge {
                         }
                     });
             //Delete Old Entries From Current Playlist
-            ledger = Files.walk(currentPlaylistFolder, FileVisitOption.FOLLOW_LINKS).parallel().map(SBDatapacket::new)
-                    .collect(Collectors.toList());
-            ledger.parallelStream().filter(data -> !playlist.isInCurrentDateRange(data)).map(SBDatapacket::getPath)
+            combined.parallelStream().filter(data -> !playlist.isInCurrentDateRange(data)).map(SBDatapacket::getPath)
                     .map(path -> currentPlaylistFolder.resolve(path.getFileName()))
                     .map(Path::toFile).forEach(file -> FileUtils.deleteQuietly(file));
-            ledger = ledger.parallelStream().filter(data -> playlist.isInCurrentDateRange(data))
+            combined = combined.parallelStream().filter(data -> playlist.isInCurrentDateRange(data))
                     .collect(Collectors.toList());
-            MAPPER.writeValue(ledgerPath.toFile(), ledger);
+            MAPPER.writeValue(ledgerPath.toFile(), combined);
         }
     }
 
@@ -439,10 +450,11 @@ public enum SpaceBridge {
      * A wrapper class for optimising performance of the generate playlists
      * subroutine.
      */
-    @JsonTypeInfo(use = JsonTypeInfo.Id.CLASS, include = JsonTypeInfo.As.PROPERTY, property = "Class")
     private static class SBDatapacket {
 
+        @JsonProperty(value = "path")
         private final Path path;
+        @JsonProperty(value = "metadata")
         private final ConverterMetadata metadata;
 
         public SBDatapacket(Path path) {
@@ -457,7 +469,8 @@ public enum SpaceBridge {
          * @param date The date the file was created
          */
         @JsonCreator
-        SBDatapacket(Path path, ConverterMetadata metadata) {
+        SBDatapacket(@JsonProperty(value = "path") Path path,
+                @JsonProperty(value = "metadata") ConverterMetadata metadata) {
             this.path = path;
             this.metadata = metadata;
         }

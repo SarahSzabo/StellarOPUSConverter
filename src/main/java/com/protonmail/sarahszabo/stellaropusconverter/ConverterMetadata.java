@@ -5,6 +5,8 @@
  */
 package com.protonmail.sarahszabo.stellaropusconverter;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.protonmail.sarahszabo.stellaropusconverter.util.StellarGravitonField;
 import java.nio.file.Path;
 import java.time.LocalDate;
@@ -21,11 +23,17 @@ public final class ConverterMetadata {
      */
     static final ConverterMetadata DEFAULT_METADATA = new ConverterMetadata("Unknown Artist",
             "Unknown Title", Main.FULL_PROGRAM_NAME, LocalDate.MAX, StellarGravitonField.newPath(""), Integer.MAX_VALUE);
+    @JsonProperty
     private final String artist;
+    @JsonProperty
     private final String title;
+    @JsonProperty
     private final String createdBy;
+    @JsonProperty
     private final LocalDate date;
+    @JsonProperty
     private final Path albumArtPath;
+    @JsonProperty
     private final int bitrate;
 
     /**
@@ -38,8 +46,13 @@ public final class ConverterMetadata {
      * track
      * @param date The date this track was created
      * @param albumArtPath The path to the album art
+     * @param bitrate The bitrate of the track
      */
-    public ConverterMetadata(String artist, String title, String createdBy, LocalDate date, Path albumArtPath, int bitrate) {
+    @JsonCreator
+    public ConverterMetadata(@JsonProperty(value = "artist") String artist,
+            @JsonProperty(value = "title") String title, @JsonProperty(value = "createdBy") String createdBy,
+            @JsonProperty(value = "date") LocalDate date, @JsonProperty(value = "albumArtPath") Path albumArtPath,
+            @JsonProperty(value = "bitrate") int bitrate) {
         this.artist = Objects.requireNonNull(artist);
         this.title = Objects.requireNonNull(title);
         this.createdBy = Objects.requireNonNull(createdBy);

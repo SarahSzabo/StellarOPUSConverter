@@ -7,6 +7,8 @@ package com.protonmail.sarahszabo.stellaropusconverter;
 
 import com.protonmail.sarahszabo.stellaropusconverter.util.StellarGravitonField;
 import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -24,10 +26,12 @@ import javafx.application.Platform;
 import javafx.embed.swing.JFXPanel;
 import javafx.scene.control.ChoiceDialog;
 import javafx.scene.control.TextInputDialog;
+import javafx.scene.image.Image;
 import javafx.scene.input.Clipboard;
 import javafx.scene.layout.Region;
 import javafx.stage.DirectoryChooser;
 import javafx.stage.FileChooser;
+import javafx.stage.Stage;
 import javafx.util.Duration;
 import org.controlsfx.control.Notifications;
 
@@ -73,6 +77,24 @@ public enum StellarUI {
         //Initialize Toolkit
         new JFXPanel();
         Platform.setImplicitExit(false);
+    }
+
+    /**
+     * Gets the iconized stage owner.
+     *
+     * @return The iconized stage
+     */
+    private static Stage getOwner() {
+        try {
+            Stage stage = new Stage();
+            stage.getIcons().add(new Image(Files.newInputStream(StellarDiskManager.SYSTEM_ICON)));
+            stage.show();
+            stage.close();
+            return stage;
+        } catch (IOException ex) {
+            Logger.getLogger(StellarUI.class.getName()).log(Level.SEVERE, null, ex);
+            throw new RuntimeException(ex);
+        }
     }
 
     /**
@@ -290,7 +312,7 @@ public enum StellarUI {
             chooser.getExtensionFilters().add(videoFilter);
             chooser.setSelectedExtensionFilter(videoFilter);
             Platform.runLater(() -> {
-                List<File> files = chooser.showOpenMultipleDialog(null);
+                List<File> files = chooser.showOpenMultipleDialog(getOwner());
                 try {
                     if (files == null) {
                         System.out.println("No Files Chosen, Aborting");
