@@ -19,12 +19,14 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
+import java.util.function.Function;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import javafx.application.Platform;
 import javafx.embed.swing.JFXPanel;
 import javafx.scene.control.ChoiceDialog;
+import javafx.scene.control.Dialog;
 import javafx.scene.control.TextInputDialog;
 import javafx.scene.image.Image;
 import javafx.scene.input.Clipboard;
@@ -80,7 +82,36 @@ public enum StellarUI {
     }
 
     /**
-     * Gets the iconized stage owner.
+     * Sets the icon for the dialog.
+     *
+     * @param <T> The type of the dialog
+     * @param dialog The dialog to set
+     * @throws IOException If something happened
+     */
+    private static <T> void setDialogIcon(Dialog<T> dialog) throws IOException {
+        Stage stage = (Stage) dialog.getDialogPane().getScene().getWindow();
+        stage.getIcons().add(new Image(Files.newInputStream(StellarDiskManager.SYSTEM_ICON)));
+        dialog.getDialogPane().setMinSize(Region.USE_PREF_SIZE, Region.USE_PREF_SIZE);
+        dialog.setResizable(true);
+    }
+
+    /**
+     * Performs the icon set operation with the specified supplier to set the
+     * owner given the stage.
+     *
+     * @param function The set icon function
+     * @return The same return type as the function
+     */
+    private static <T> T stageOP(Function<Stage, T> function) {
+        Stage stage = getOwner();
+        stage.show();
+        T t = function.apply(stage);
+        stage.close();
+        return t;
+    }
+
+    /**
+     * Gets the iconized stage owner. Should be run from the platform thread.
      *
      * @return The iconized stage
      */
@@ -89,7 +120,6 @@ public enum StellarUI {
             Stage stage = new Stage();
             stage.getIcons().add(new Image(Files.newInputStream(StellarDiskManager.SYSTEM_ICON)));
             stage.show();
-            stage.close();
             return stage;
         } catch (IOException ex) {
             Logger.getLogger(StellarUI.class.getName()).log(Level.SEVERE, null, ex);
@@ -117,8 +147,9 @@ public enum StellarUI {
                     ChoiceDialog<Path> dialog = new ChoiceDialog<>(null, paths);
                     dialog.setContentText("Choose The Path of the Video to Rip the Album Art From: ");
                     dialog.setTitle("Stellar: Picture-Select Path Choice");
+                    setDialogIcon(dialog);
                     PATH_QUEUE.put(dialog.showAndWait());
-                } catch (InterruptedException ex) {
+                } catch (InterruptedException | IOException ex) {
                     Logger.getLogger(StellarUI.class.getName()).log(Level.SEVERE, null, ex);
                 }
             });
@@ -136,7 +167,7 @@ public enum StellarUI {
      *
      * @return The files or null if none
      */
-    public static List<Path> getFilesFromClipboard() {
+    public static Optional<List<Path>> getFilesFromClipboard() {
         try {
             synchronized (PATH_LIST_QUEUE) {
                 Platform.runLater(() -> {
@@ -147,12 +178,12 @@ public enum StellarUI {
                         Logger.getLogger(StellarUI.class.getName()).log(Level.SEVERE, null, ex);
                     }
                 });
-                return PATH_LIST_QUEUE.take();
+                return Optional.of(PATH_LIST_QUEUE.take());
             }
         } catch (InterruptedException ex) {
             Logger.getLogger(StellarUI.class.getName()).log(Level.SEVERE, null, ex);
         }
-        return null;
+        return Optional.empty();
     }
 
     /**
@@ -185,9 +216,10 @@ public enum StellarUI {
                     dialog.setTitle("Stellar: Enter Artist/Track Title");
                     dialog.setHeaderText((header != null ? ("(" + newHeader + ")\n") : "")
                             + "Enter Author/Track Title Like So: Author, Title");
-                    dialog.getDialogPane().setMinSize(Region.USE_PREF_SIZE, Region.USE_PREF_SIZE);
+                    //Set Icon
+                    setDialogIcon(dialog);
                     ASK_USER_METADATA.put(dialog.showAndWait());
-                } catch (InterruptedException ex) {
+                } catch (InterruptedException | IOException ex) {
                     Logger.getLogger(StellarUI.class.getName()).log(Level.SEVERE, null, ex);
                 }
             });
@@ -254,7 +286,7 @@ public enum StellarUI {
                 }
                 chooser.setTitle("Stellar: " + label);
                 chooser.setSelectedExtensionFilter(currentlySelected.getFilter());
-                File file = chooser.showOpenDialog(null);
+                File file = stageOP(stage -> chooser.showOpenDialog(stage));
                 try {
                     PATH_QUEUE.put(file == null ? Optional.empty() : Optional.of(file.toPath()));
                 } catch (InterruptedException ex) {
@@ -282,7 +314,7 @@ public enum StellarUI {
             Platform.runLater(() -> {
                 DirectoryChooser chooser = new DirectoryChooser();
                 chooser.setTitle("Stellar: Choose Directory for " + type);
-                File file = chooser.showDialog(null);
+                File file = stageOP(stage -> chooser.showDialog(stage));
                 try {
                     PATH_QUEUE.put(Optional.of(file.toPath()));
                 } catch (InterruptedException ex) {
@@ -312,7 +344,7 @@ public enum StellarUI {
             chooser.getExtensionFilters().add(videoFilter);
             chooser.setSelectedExtensionFilter(videoFilter);
             Platform.runLater(() -> {
-                List<File> files = chooser.showOpenMultipleDialog(getOwner());
+                List<File> files = stageOP(stage -> chooser.showOpenMultipleDialog(getOwner()));
                 try {
                     if (files == null) {
                         System.out.println("No Files Chosen, Aborting");

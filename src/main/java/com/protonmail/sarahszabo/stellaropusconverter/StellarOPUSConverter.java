@@ -313,45 +313,6 @@ public class StellarOPUSConverter {
     }
 
     /**
-     * Re indexes an OPUS file, applying modern standards to older versions of
-     * .opus files. Uses 320K by default. The .opus file must exist already to
-     * use this subroutine. Chains to
-     * {@link StellarOPUSConverter#reIndexOPUSFile(int)}
-     *
-     * @throws java.io.IOException If something went wrong
-     */
-    public void reIndexOPUSFile() throws IOException {
-        reIndexOPUSFile(320);
-    }
-
-    /**
-     * Checks that the .opus file exists or throws an exception.
-     */
-    private void checkFileExists() {
-        if (!Files.exists(this.originalFilePath)) {
-            throw new IllegalStateException("You're using a subroutine that requires that the .opus file exists already,"
-                    + " but you're called it at a time when it doesn't!");
-        }
-    }
-
-    /**
-     * Re indexes an OPUS file, applying modern standards to older versions of
-     * .opus files. Has a parameter for bitrate, ex: 320 -> 320K. The .opus file
-     * must exist already to use this subroutine. Uses the metadata provided in
-     * the constructor, or defaults if none were set.
-     *
-     * @param bitrate The bitrate in K
-     * @throws java.io.IOException If something went wrong
-     */
-    public void reIndexOPUSFile(int bitrate) throws IOException {
-        checkFileExists();
-        //Convert to .opus
-        Path opusFile = toOpusFile(bitrate, null, null);
-        //Copy Converted File to Output Directory
-        StellarDiskManager.copyFromTemp(opusFile.getFileName().toString());
-    }
-
-    /**
      * Converts the selected file to .OPUS. Doesn't attempt to edit the
      * filename, or automatically generate metadata aside for the title, which
      * is set to the title of the track.
@@ -528,8 +489,6 @@ public class StellarOPUSConverter {
                 this.logger.log(Level.SEVERE, "Error encountered during conversion", ex);
             }
         });
-        //Clear Metadata to Restore Default State for next use
-        this.metadata.clear();
         return Optional.of(newPath(StellarDiskManager.getOutputFolder(), title + ".opus"));
     }
 
@@ -620,10 +579,7 @@ public class StellarOPUSConverter {
                 Logger.getLogger(StellarOPUSConverter.class.getName()).log(Level.SEVERE, null, ex);
             }
         });
-        //Reindex to Save Album Art
-        reIndexOPUSFile();
-        //Clear Metadata to Restore to Default State
-        this.metadata.clear();
+        toOpusFile(bitrate, start, end);
         return Optional.of(newPath(StellarDiskManager.getOutputFolder(), title + ".opus"));
     }
 

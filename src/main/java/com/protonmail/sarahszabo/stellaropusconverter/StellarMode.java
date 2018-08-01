@@ -37,7 +37,7 @@ public enum StellarMode {
         @Override
         public void start(String... args) throws IOException {
             //Get From Clipboard
-            List<Path> paths = new ArrayList<>(StellarUI.getFilesFromClipboard());
+            List<Path> paths = new ArrayList<>(StellarUI.getFilesFromClipboard().get());
             //Select File From List
             Path selected = StellarUI.selectPath(paths).orElseThrow(() -> new RuntimeException("Nothing Selected from path chooser!"));
             //Remove Video Entry from Paths
@@ -148,7 +148,7 @@ public enum StellarMode {
     GET_FROM_CLIPBOARD {
         @Override
         public void start(String... args) {
-            doMultipleConversion(Optional.of(StellarUI.getFilesFromClipboard()));
+            doMultipleConversion(Optional.of(StellarUI.getFilesFromClipboard().get()));
         }
 
     },
@@ -169,7 +169,7 @@ public enum StellarMode {
     CLIPBOARD_SAME_ARTIST {
         @Override
         public void start(String... args) throws IOException {
-            printFileList(StellarHyperspace.runGeneralConversionTasks(StellarUI.getFilesFromClipboard().stream()
+            printFileList(StellarHyperspace.runGeneralConversionTasks(StellarUI.getFilesFromClipboard().get().stream()
                     .map(path -> toTaskFormat(path, args[1])).collect(Collectors.toList())));
         }
 

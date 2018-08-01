@@ -13,6 +13,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -41,8 +43,6 @@ public class Main {
      * @throws java.io.IOException If something went wrong
      */
     public static void main(String[] args) throws IOException {
-        StellarUI.getFiles();
-        System.exit(0);
         //We have to check greater than section first, then we check integer comparison
         //Odd Number of Entries >= 3 (URL, timestamp0 timestamp1 timestamp2 timestamp3
         if (args.length >= 3 && argIsLink(args[0]) && (args.length + 1) % 2 == 0
@@ -64,7 +64,7 @@ public class Main {
                 StellarMode.GET_FROM_CLIPBOARD.start(args);
             } //Initiate Region Scan, Applying all filters from grand filter
             else if (args[0].equalsIgnoreCase("Region-Scan")) {
-                StellarGreatFilter.filterPaths(StellarUI.getFilesFromClipboard());
+                StellarGreatFilter.filterPaths(StellarUI.getFilesFromClipboard().get());
             } //Ask For Status of Folder Paths
             else if (args[0].equalsIgnoreCase("Status")) {
                 System.out.println(StellarDiskManager.DISKMANAGER.getState());
@@ -102,7 +102,7 @@ public class Main {
                     messageThenExit("Space-Bridge Folder Changed To: " + path);
                 } //Set Picture Metadata
                 if (args[1].equalsIgnoreCase("Album-Art")) {
-                    Path opusFile = StellarUI.getFilesFromClipboard().get(0), imageFile = StellarUI.getFile("Select an Image File",
+                    Path imageFile = StellarUI.getFile("Select an Image File",
                             StellarUI.EXTENSION_FILTER.PICTURE_FILES).orElseGet(() -> {
                                 try {
                                     return StellarDiskManager.getGenericPicture();
@@ -111,18 +111,25 @@ public class Main {
                                     throw new RuntimeException("No Random Picture Available, Check the Configuration Folder");
                                 }
                             });
-                    if (opusFile == null || imageFile == null) {
+                    List<Path> files = StellarUI.getFilesFromClipboard().orElse(Collections.emptyList());
+                    if (files.isEmpty()) {
                         throw new IllegalStateException("Attempt to set album art with null clipboard opus file or null image selected");
                     }
-                    //Get metadata from file
-                    StellarOPUSConverter.ConverterMetadataBuilder metadata
-                            = new StellarOPUSConverter.ConverterMetadataBuilder(StellarDiskManager.getMetadata(opusFile));
-                    //Set to new image
-                    metadata.albumArtPath(imageFile);
-                    //Map new metadata to opus file
-                    StellarOPUSConverter converter = new StellarOPUSConverter(StellarGravitonField.newPath(opusFile),
-                            StellarDiskManager.getOutputFolder(), Logger.getLogger(StellarOPUSConverter.class.getName()), metadata.buildMetadata());
-                    converter.reIndexOPUSFile();
+                    files.parallelStream().forEach(path -> {
+                        try {
+                            //Get metadata from file
+                            StellarOPUSConverter.ConverterMetadataBuilder metadata
+                                    = new StellarOPUSConverter.ConverterMetadataBuilder(StellarDiskManager.getMetadata(path));
+                            //Set to new image
+                            metadata.albumArtPath(imageFile);
+                            //Map new metadata to opus file
+                            StellarOPUSConverter converter = new StellarOPUSConverter(StellarGravitonField.newPath(path),
+                                    StellarDiskManager.getOutputFolder(), metadata.buildMetadata());
+                            converter.convertToOPUS();
+                        } catch (IOException ex) {
+                            Logger.getLogger(Main.class.getName()).log(Level.SEVERE, null, ex);
+                        }
+                    });
 
                 }
             } else {
