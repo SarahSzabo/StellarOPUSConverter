@@ -20,6 +20,8 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
 import java.util.Random;
@@ -48,14 +50,14 @@ public enum StellarDiskManager {
      */
     public static final Path CONFIGURATION_FOLDER = newPath(USER_DIR, "Configuration");
     /**
+     * The path to the help file containing all the help documentation for the
+     * program.
+     */
+    public static final Path HELP_FILE = CONFIGURATION_FOLDER.resolve(Paths.get("Help Text.dat"));
+    /**
      * The previous state file
      */
     public static final Path PREVIOUS_CONFIGURATION = Paths.get(CONFIGURATION_FOLDER.toString(), "Previous State.json");
-
-    /**
-     * The location of the help text file.
-     */
-    public static final Path HELP_TEXT_PATH = Paths.get(CONFIGURATION_FOLDER.toString(), "Help Text.dat");
 
     /**
      * The path to the default pictures folder.
@@ -78,13 +80,26 @@ public enum StellarDiskManager {
     private static final Logger logger = StellarLoggingFormatter.forClass(StellarDiskManager.class);
 
     /**
+     * Gets the full folder of generic picture files.
+     *
+     * @return The read-only collection of picture files
+     */
+    public static Collection<Path> getGenericPictures() {
+        try {
+            return Files.list(DEFAULT_PICTURES).collect(Collectors.toUnmodifiableList());
+        } catch (IOException ex) {
+            Logger.getLogger(StellarDiskManager.class.getName()).log(Level.SEVERE, null, ex);
+            throw new RuntimeException("Generic Picture Folder Missing", ex);
+        }
+    }
+
+    /**
      * Selects a random picture from our cache of generic cover art.
      *
      * @return The path to the cover art
-     * @throws java.io.IOException If something went wrong
      */
-    public static Path getGenericPicture() throws IOException {
-        List<Path> pictures = Files.list(DEFAULT_PICTURES).collect(Collectors.toList());
+    public static Path getGenericPicture() {
+        List<Path> pictures = new ArrayList<>(getGenericPictures());
         Path random = pictures.get(new Random().nextInt(pictures.size()));
         return random;
     }
@@ -119,13 +134,17 @@ public enum StellarDiskManager {
             //Import .Opus File to ReIndexing Directory, Use Reindexing folder to avoid name clashes
             Path reindexingOpusFile = newPath(REINDEXING_FOLDER, path.getFileName());
             Files.createDirectories(REINDEXING_FOLDER);
-            Files.copy(path, reindexingOpusFile, StandardCopyOption.REPLACE_EXISTING);
+            synchronized (StellarDiskManager.class) {
+                if (Files.notExists(reindexingOpusFile)) {
+                    Files.copy(path, reindexingOpusFile, StandardCopyOption.REPLACE_EXISTING);
+                }
+            }
             //Create Metadata file
             processOP(true, metadataFilePath, REINDEXING_FOLDER, "exiftool", path.getFileName().toString());
             //Trim Entries from exiftool
             List<String> lines = Files.readAllLines(metadataFilePath).stream().collect(Collectors.toList());
-            StellarOPUSConverter.ConverterMetadataBuilder metadata
-                    = new StellarOPUSConverter.ConverterMetadataBuilder(StellarOPUSConverter.getDefaultMetadata());
+            ConverterMetadataBuilder metadata
+                    = new ConverterMetadataBuilder(StellarOPUSConverter.getDefaultMetadata());
             for (String str : lines) {
                 String contents = str.split(":")[0];
                 if (contents.matches("Artist\\s+")) {
@@ -181,11 +200,9 @@ public enum StellarDiskManager {
      * @throws IOException If the help file is missing
      */
     public static String readHelpText() throws IOException {
-        if (Files.notExists(HELP_TEXT_PATH)) {
-            throw new IllegalStateException("Help files not found in their home directory");
-        } else {
-            return new String(Files.readAllBytes(HELP_TEXT_PATH));
-        }
+        //Old Method "In Jar":
+        //Path helpTextPath  =  new File(StellarDiskManager.class.getResource("/Help Text.dat").toURI()).toPath();
+        return new String(Files.readAllBytes(HELP_FILE));
     }
 
     /**

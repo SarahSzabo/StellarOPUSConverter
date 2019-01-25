@@ -12,6 +12,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.Callable;
@@ -21,6 +22,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import javafx.application.Platform;
+import org.apache.commons.io.FileUtils;
 
 /**
  * An interface representing the mode that the converter is in.
@@ -52,8 +54,8 @@ public enum StellarMode {
             }
             for (Path path : paths) {
                 //Get Old Metadata for our Files
-                StellarOPUSConverter.ConverterMetadataBuilder oldOpusMetadata
-                        = new StellarOPUSConverter.ConverterMetadataBuilder(StellarDiskManager.getMetadata(path));
+                ConverterMetadataBuilder oldOpusMetadata
+                        = new ConverterMetadataBuilder(StellarDiskManager.getMetadata(path));
                 //Set With new Album Art
                 oldOpusMetadata.albumArtPath(newMetadata.getAlbumArtPath());
                 StellarOPUSConverter converter = new StellarOPUSConverter(path, oldOpusMetadata.buildMetadata());
@@ -130,6 +132,7 @@ public enum StellarMode {
                 }
             }
             Logger.getLogger(StellarMode.class.getName()).info("\n\nFinished Files: " + text);
+            deleteOriginalFiles(List.of(path));
         }
     },
     /**
@@ -212,6 +215,23 @@ public enum StellarMode {
     }
 
     /**
+     * Prompts the user if they want to delete all the original files and does
+     * it if they want to.
+     *
+     * @param paths The collection of paths to delete
+     */
+    private static void deleteOriginalFiles(Collection<Path> paths) {
+        if (StellarUI.showConfirmationDialog("Delete Original Files? \n\n" + paths.toString())) {
+            for (var path : paths) {
+                FileUtils.deleteQuietly(path.toFile());
+                logger.info(path + " deleted!\n");
+            }
+        } else {
+            Logger.getLogger(StellarMode.class.getName()).info("All Paths Do Not Exist or Are Directories");
+        }
+    }
+
+    /**
      * Does multiple conversions by sending them all to Hyperspace.
      *
      * @param paths The paths of the files to convert
@@ -229,16 +249,16 @@ public enum StellarMode {
                 }
             }).collect(Collectors.toList());
             Logger.getLogger(StellarMode.class.getName()).info("\n\n\nCompleted Output Files:");
-            finalPaths.stream().forEach(path -> Logger.getLogger(StellarMode.class.getName()).info(path.toString()));
-        } else {
-            Logger.getLogger(StellarMode.class.getName()).info("All Paths Do Not Exist or Are Directories");
+            finalPaths.stream().forEachOrdered(path -> System.out.println(path));
+            //Delete Original Files
+            deleteOriginalFiles(paths.get());
+            try {
+                StellarHyperspace.initiateFalseVacuum();
+            } catch (InterruptedException ex) {
+                Logger.getLogger(StellarMode.class.getName()).log(Level.SEVERE, null, ex);
+            }
+            Platform.exit();
         }
-        try {
-            StellarHyperspace.initiateFalseVacuum();
-        } catch (InterruptedException ex) {
-            Logger.getLogger(StellarMode.class.getName()).log(Level.SEVERE, null, ex);
-        }
-        Platform.exit();
     }
 
     private static void printIOExceptionMessage() {

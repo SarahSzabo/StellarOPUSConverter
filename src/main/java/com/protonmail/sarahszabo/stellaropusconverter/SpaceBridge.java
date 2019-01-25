@@ -427,13 +427,14 @@ public enum SpaceBridge {
                     .forEach(path -> {
                         try {
                             //Checking for existance is far less intensive than copying a large 320K file
+                            path.toString();
                             Path destinationPath = currentPlaylistFolder.resolve(path.getFileName());
                             if (Files.notExists(destinationPath)) {
-                                Files.copy(path, destinationPath, StandardCopyOption.COPY_ATTRIBUTES);
+                                Files.copy(path, destinationPath, StandardCopyOption.COPY_ATTRIBUTES, StandardCopyOption.REPLACE_EXISTING);
                             }
                         } catch (IOException ex) {
                             Logger.getLogger(SpaceBridge.class.getName()).log(Level.SEVERE, null, ex);
-                            SB_EXCEPTION_LOGGER.severe("I/O Exception While trying to copy file to current playlist folder" + ex);
+                            SB_EXCEPTION_LOGGER.severe("I/O Exception While trying to copy file to current playlist folder " + ex);
                         }
                     });
             //Delete Old Entries From Current Playlist

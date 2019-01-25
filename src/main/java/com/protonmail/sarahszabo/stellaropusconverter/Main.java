@@ -104,12 +104,7 @@ public class Main {
                 if (args[1].equalsIgnoreCase("Album-Art")) {
                     Path imageFile = StellarUI.getFile("Select an Image File",
                             StellarUI.EXTENSION_FILTER.PICTURE_FILES).orElseGet(() -> {
-                                try {
-                                    return StellarDiskManager.getGenericPicture();
-                                } catch (IOException ex) {
-                                    Logger.getLogger(Main.class.getName()).log(Level.SEVERE, null, ex);
-                                    throw new RuntimeException("No Random Picture Available, Check the Configuration Folder");
-                                }
+                                return StellarDiskManager.getGenericPicture();
                             });
                     List<Path> files = StellarUI.getFilesFromClipboard().orElse(Collections.emptyList());
                     if (files.isEmpty()) {
@@ -118,8 +113,8 @@ public class Main {
                     files.parallelStream().forEach(path -> {
                         try {
                             //Get metadata from file
-                            StellarOPUSConverter.ConverterMetadataBuilder metadata
-                                    = new StellarOPUSConverter.ConverterMetadataBuilder(StellarDiskManager.getMetadata(path));
+                            ConverterMetadataBuilder metadata
+                                    = new ConverterMetadataBuilder(StellarDiskManager.getMetadata(path));
                             //Set to new image
                             metadata.albumArtPath(imageFile);
                             //Map new metadata to opus file

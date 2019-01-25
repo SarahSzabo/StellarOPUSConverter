@@ -63,8 +63,10 @@ public class StellarOPUSConverter {
             return metadata.getDate().equals(getDefaultMetadata().getDate());
         } else if (type == MetadataType.BITRATE) {
             return metadata.getBitrate() == ConverterMetadata.DEFAULT_METADATA.getBitrate();
-        } else if (type == MetadataType.ALBUM_ART) {
-            return metadata.getAlbumArtPath().equals(ConverterMetadata.DEFAULT_METADATA.getAlbumArtPath());
+        } //Is default metadata if is equal to the default album art, or is a generic picture
+        else if (type == MetadataType.ALBUM_ART) {
+            return metadata.getAlbumArtPath().equals(ConverterMetadata.DEFAULT_METADATA.getAlbumArtPath())
+                    || StellarDiskManager.getGenericPictures().stream().anyMatch(path -> metadata.getAlbumArtPath().equals(path));
         } else {
             throw new IllegalStateException("Unrecognized Metadata Option");
         }
@@ -121,12 +123,28 @@ public class StellarOPUSConverter {
     /**
      * The previous program versions used a list to keep track of metadata, this
      * is an adapter subroutine for that format.
+     *
+     * @deprecated This is no longer used since implementation of
+     * {@link ConverterMetadata}
      */
+    @Deprecated
     private static Map<MetadataType, String> listToMap(List<String> list) {
         Map<MetadataType, String> map = new HashMap<>(2);
         map.put(MetadataType.ARTIST, list.get(0));
         map.put(MetadataType.TITLE, list.get(1));
         return map;
+    }
+
+    /**
+     * Applies the file name filters to the string and returns a nicely /*
+     * formatted string. Removes unwanted information, such as (HQ 320K) from
+     * the filename.
+     *
+     * @param str The string filename
+     * @return The nicely formatted filename
+     */
+    private static String applyFileNameFilters(String str) {
+        return str.replaceFirst("\\(HQ.*\\)", "").trim();
     }
 
     /**
@@ -142,13 +160,21 @@ public class StellarOPUSConverter {
     private static ConverterMetadata generateMetadataFromRegex(Path filePath, String... separators) {
         List<String> dividers = Arrays.asList(separators);
         ConverterMetadataBuilder builder = new ConverterMetadataBuilder(getDefaultMetadata());
-        String originalFileNameNoEXT = stripFileExtension(filePath);
+        //Apply Filter to Remove (HQ 192K) or some other such annoyance from filename
+        String originalFileNameNoEXT = applyFileNameFilters(stripFileExtension(filePath));
         if (dividers.stream().anyMatch(separator -> originalFileNameNoEXT.matches(".*[" + separator + "]+.*"))) {
+            //Find the Divider that Matches
+            for (var separator : dividers) {
+                if (originalFileNameNoEXT.matches(".*[" + separator + "]+.*")) {
+                    //We've found the seperator that matches
+                    var split = originalFileNameNoEXT.split(separator);
+                    builder.artist(split[0].trim());
+                    builder.title(split[1].trim());
+                    break;
+                }
+            }
             //Maps to proper metadata format
-            HashMap<MetadataType, String> map = new HashMap<>(3);
-            map.putAll(listToMap(getListFromRegex("[" + dividers.stream().filter(separator
-                    -> originalFileNameNoEXT.matches(".*[" + separator + "+].*")).findFirst().get() + "*]", filePath).stream()
-                    .map(string -> preferredTitleFormat(string)).collect(Collectors.toList())));
+
         }
         return builder.buildMetadata();
     }
@@ -213,17 +239,6 @@ public class StellarOPUSConverter {
         this.opusFilePath = newPath(this.outputFolder, this.opusFileName);
         //Define Metadata Before Metadata Generation
         this.metadata = new ConverterMetadataBuilder(Objects.requireNonNull(metadata));
-        //Artist/Title Cannot be Null
-        if (isDefaultMetadata(MetadataType.TITLE) || isDefaultMetadata(MetadataType.ARTIST)) {
-            //Attempt to Generate Metadata
-            if (!generateMetadata()) {
-                throw new IllegalArgumentException("Artist/Title cannot be null in passed metadata");
-            }
-        }
-        //If The Default metadata is Present, Select a Random Default Image
-        if (isDefaultMetadata(MetadataType.ALBUM_ART)) {
-            this.metadata.albumArtPath(StellarDiskManager.getGenericPicture());
-        }
     }
 
     /**
@@ -291,6 +306,19 @@ public class StellarOPUSConverter {
     }
 
     /**
+     * Generates the title and artist from the filename format, or else asks the
+     * user for the information.
+     */
+    private void generateTitleArtist() {
+        //Artist/Title Cannot be Null
+        if (isDefaultMetadata(MetadataType.ARTIST) || isDefaultMetadata(MetadataType.TITLE)) {
+            if (!generateMetadata()) {
+                this.metadata.addAll(StellarUI.askUserForArtistTitle(applyFileNameFilters(this.originalFileNameNoEXTPreferred)));
+            }
+        }
+    }
+
+    /**
      * Helper method for automating comparisons against default metadata fields.
      * Specify the field for our metadata, and we'll compare it against the
      * default metadata field.
@@ -338,8 +366,8 @@ public class StellarOPUSConverter {
      */
     public Optional<Path> convertToOPUS(int bitrate) throws IOException {
         //If Metadata not modified from default, generate metadata
-        if (this.fileExtension == FileExtension.MP4) {
-            generateMetadata();
+        if (isDefaultMetadata(MetadataType.TITLE) && isDefaultMetadata(MetadataType.ARTIST)) {
+            generateTitleArtist();
             return convertToOPUS(this.metadata.getArtist(), this.metadata.getTitle());
         }
         return Optional.of(toOpusFile(bitrate));
@@ -385,7 +413,7 @@ public class StellarOPUSConverter {
         //Fast FLAC Audio ripped from video
         //ffmpeg -i "video.m2ts" -vn -sn -acodec flac -compression_level 12 "audio.flac"
         processOP(true, "ffmpeg", "-i", this.originalFilePath.getFileName().toString(), "-ss", start.toString(),
-                "-t", end.toString(), "-y", "-vn", "-sn", "-acodec", "flac",
+                "-to", end.toString(), "-y", "-vn", "-sn", "-acodec", "flac",
                 "-compression_level", "0", title);
         return newPath(StellarDiskManager.getTempDirectory(), title);
     }
@@ -444,7 +472,10 @@ public class StellarOPUSConverter {
         if (isDefaultMetadata(MetadataType.DATE)) {
             this.metadata.date(LocalDate.now());
         }
-        //Set Created By
+        //Check Album Art
+        if (isDefaultMetadata(MetadataType.ALBUM_ART)) {
+            this.metadata.albumArtPath(StellarDiskManager.getGenericPicture());
+        }//Set Created By
         this.metadata.createdBy(CREATED_BY_TAG + "=" + Main.FULL_PROGRAM_NAME);
         //Set Bitrate if Not Already Set
         this.metadata.bitrate(isDefaultMetadata(MetadataType.BITRATE) ? bitrate : this.metadata.getBitrate());
@@ -484,7 +515,7 @@ public class StellarOPUSConverter {
                 processImage();
                 //Encode new .opus file using metadata set from .flac file & image in pictures folder
                 toOpusFile(bitrate, null, null);
-            } catch (InterruptedException | IOException ex) {
+            } catch (IOException ex) {
                 Logger.getLogger(StellarOPUSConverter.class.getName()).log(Level.SEVERE, null, ex);
                 this.logger.log(Level.SEVERE, "Error encountered during conversion", ex);
             }
@@ -518,8 +549,8 @@ public class StellarOPUSConverter {
      * @throws java.io.IOException If something happened
      */
     public Optional<Path> convertToOPUS(StellarFFMPEGTimeStamp start, StellarFFMPEGTimeStamp end) throws IOException {
-        //Convert to Proper Format
-        this.metadata.addAll(StellarUI.askUserForArtistTitle("Start: " + start + "\nEnd: " + end, ""));
+        this.metadata.addAll(StellarUI.askUserForArtistTitle("Filename: " + this.originalFilePath.getFileName()
+                + "\nStart: " + start + "\nEnd: " + end, ""));
         return convertToOPUS(this.metadata.getArtist(), this.metadata.getTitle(), start, end);
     }
 
@@ -575,35 +606,12 @@ public class StellarOPUSConverter {
             try {
                 processImage();
                 toOpusFile(bitrate, start, end);
-            } catch (InterruptedException | IOException ex) {
+            } catch (IOException ex) {
                 Logger.getLogger(StellarOPUSConverter.class.getName()).log(Level.SEVERE, null, ex);
             }
         });
         toOpusFile(bitrate, start, end);
         return Optional.of(newPath(StellarDiskManager.getOutputFolder(), title + ".opus"));
-    }
-
-    /**
-     * Tests to see if the format is matched. Specify the regex for the
-     * separator. Filename usually take on the form newPath SONGAUTHOR --
-     * SONGTITLE. Separators usually look like "+" or "|". Returns a list that,
-     * by convention has zeroith element as the artist, and second element as
-     * the title.
-     *
-     * @param separators The regular expressions to use
-     * @param map The map to fill with the metadata
-     * @return The metadata list
-     */
-    private void generateMetadataFromRegex(String... separators) {
-        List<String> dividers = Arrays.asList(separators);
-        if (dividers.stream().anyMatch(separator -> this.originalFileNameNoEXT.matches(".*[" + separator + "]+.*"))) {
-            //Maps to proper metadata format
-            this.metadata.addAll(listToMap(getListFromRegex("[" + dividers.stream().filter(separator
-                    -> this.originalFileNameNoEXT.matches(".*[" + separator + "+].*")).findFirst().get() + "*]", this.originalFilePath).stream()
-                    .map(string -> preferredTitleFormat(string)).collect(Collectors.toList())));
-        } else {
-            this.metadata.addAll(StellarUI.askUserForArtistTitle(this.originalFileNameNoEXT));
-        }
     }
 
     /**
@@ -613,9 +621,9 @@ public class StellarOPUSConverter {
      * @return Returns true if the metadata generation was successful
      */
     private boolean generateMetadata() {
-        generateMetadataFromRegex("-", "|", "/");
+        this.metadata.addAll(generateMetadataFromRegex(this.originalFilePath, "-", "|", "/"));
         this.opusFileName = preferredTitleFormat(this.metadata.getTitle() + ".opus");
-        this.opusFilePath = newPath(this.outputFolder, this.opusFileName);
+        this.opusFilePath = this.outputFolder.resolve(this.opusFileName);
         //Only Return True if Both Are Not Default
         return !getDefaultMetadata().equals(this.metadata.buildMetadata());
     }
@@ -657,17 +665,28 @@ public class StellarOPUSConverter {
     }
 
     /**
+     * Checks if the file extension is a video format.
+     *
+     * @return Whether or not this file is a video file or not
+     * @deprecated This will be removed in the next release
+     */
+    @Deprecated
+    private boolean isVideoFile() {
+        return this.fileExtension == FileExtension.MP4;
+    }
+
+    /**
      * Gets the image from the video, only called after the video has been moved
-     * to the working directory and attaches the image to the .opus file.
+     * to the working directory and attaches the image to the .opus file. Adds
+     * the album art path to metadata.
      *
      * @throws IOException If something went wrong
      */
-    private void processImage() throws IOException, InterruptedException {
-        Path imageFilePath = this.fileExtension == FileExtension.MP4 ? newPath(StellarDiskManager.getPictureOutputFolder(), getImageFileName())
-                : StellarUI.getFile("Choose an Image for " + this.opusFileName, StellarUI.EXTENSION_FILTER.PICTURE_FILES)
-                        .orElseThrow(() -> new RuntimeException("No Image Selected, program aborting"));
+    private void processImage() throws IOException {
         //If we're pointing at a video file, get it's image at 25s
-        if (this.fileExtension == FileExtension.MP4) {
+        if (isVideoFile()) {
+            Path imageFilePath = StellarDiskManager.getPictureOutputFolder().resolve(getImageFileName());
+
             //Check if Image Already Exists, if not, generate image
             //Are we adding a picture from .opus or a video file, in one case ask user for picture, in other case grab fom video
             if (!Files.exists(imageFilePath)) {
@@ -678,8 +697,8 @@ public class StellarOPUSConverter {
                 Files.copy(newPath(StellarDiskManager.getTempDirectory(), getImageFileName()),
                         imageFilePath);
             }
+            this.metadata.albumArtPath(imageFilePath);
         }
-        this.metadata.albumArtPath(imageFilePath);
     }
 
     /**
@@ -793,248 +812,15 @@ public class StellarOPUSConverter {
     }
 
     /**
-     * A class for building a {@link ConverterMetadata} object.
-     */
-    public static final class ConverterMetadataBuilder {
-
-        private String artist, title, createdBy;
-        private LocalDate date;
-        private Path albumArtPath;
-        private int bitrate;
-
-        /**
-         * Constructs a new builder with the default values.
-         */
-        public ConverterMetadataBuilder() {
-            this(ConverterMetadata.DEFAULT_METADATA);
-        }
-
-        /**
-         * Copy constructor for taking an already existing metadata object and
-         * copying it into the builder.
-         *
-         * @param metadata The metadata object
-         */
-        public ConverterMetadataBuilder(ConverterMetadata metadata) {
-            this.artist = preferredTitleFormat(Objects.requireNonNull(metadata.getArtist()));
-            this.title = preferredTitleFormat(Objects.requireNonNull(metadata.getTitle()));
-            this.createdBy = preferredTitleFormat(Objects.requireNonNull(metadata.getCreatedBy()));
-            this.date = Objects.requireNonNull(metadata.getDate());
-            this.albumArtPath = Objects.requireNonNull(metadata.getAlbumArtPath());
-            this.bitrate = metadata.getBitrate();
-        }
-
-        /**
-         * Copy constructor with a map as an input type.
-         *
-         * @param map The map of metadata
-         */
-        public ConverterMetadataBuilder(Map<MetadataType, String> map) {
-            this.artist = Objects.requireNonNull(map.get(MetadataType.ARTIST));
-            this.title = Objects.requireNonNull(map.get(MetadataType.TITLE));
-            if (map.get(MetadataType.CREATED_BY) != null) {
-                this.createdBy = map.get(MetadataType.CREATED_BY);
-            }
-            if (map.get(MetadataType.DATE) != null) {
-                this.date = LocalDate.parse(map.get(MetadataType.DATE), DATE_FORMATTER);
-            }
-            if (map.get(MetadataType.ALBUM_ART) != null) {
-                this.albumArtPath = newPath(map.get(MetadataType.ALBUM_ART));
-            }
-        }
-
-        /**
-         * Clears this builder, setting it to the default values.
-         *
-         * @return This builder, per <i>the builder pattern</i>
-         */
-        public ConverterMetadataBuilder clear() {
-            this.artist = ConverterMetadata.DEFAULT_METADATA.getArtist();
-            this.title = ConverterMetadata.DEFAULT_METADATA.getTitle();
-            this.createdBy = ConverterMetadata.DEFAULT_METADATA.getCreatedBy();
-            this.date = ConverterMetadata.DEFAULT_METADATA.getDate();
-            this.albumArtPath = ConverterMetadata.DEFAULT_METADATA.getAlbumArtPath();
-            return this;
-        }
-
-        /**
-         * Adds all the metadata with a map as an argument.
-         *
-         * @param metadata The map of metadata
-         * @return This builder, per <i>the builder pattern</i>
-         */
-        public ConverterMetadataBuilder addAll(ConverterMetadata metadata) {
-            this.artist = preferredTitleFormat(Objects.requireNonNull(metadata.getArtist()));
-            this.title = preferredTitleFormat(Objects.requireNonNull(metadata.getTitle()));
-            if (metadata.getCreatedBy() != null) {
-                this.createdBy = preferredTitleFormat(metadata.getCreatedBy());
-            }
-            if (metadata.getDate() != null) {
-                this.date = metadata.getDate();
-            }
-            if (metadata.getAlbumArtPath() != null) {
-                this.albumArtPath = metadata.getAlbumArtPath();
-            }
-            this.bitrate = metadata.getBitrate();
-            return this;
-        }
-
-        /**
-         * Adds all the metadata with a map as an argument.
-         *
-         * @param map The map of metadata
-         * @return This builder, per <i>the builder pattern</i>
-         */
-        public ConverterMetadataBuilder addAll(Map<MetadataType, String> map) {
-            this.artist = preferredTitleFormat(Objects.requireNonNull(map.get(MetadataType.ARTIST)));
-            this.title = preferredTitleFormat(Objects.requireNonNull(map.get(MetadataType.TITLE)));
-            if (map.get(MetadataType.CREATED_BY) != null) {
-                this.createdBy = preferredTitleFormat(map.get(MetadataType.CREATED_BY));
-            }
-            if (map.get(MetadataType.DATE) != null) {
-                this.date = LocalDate.parse(map.get(MetadataType.DATE), DATE_FORMATTER);
-            }
-            if (map.get(MetadataType.ALBUM_ART) != null) {
-                this.albumArtPath = newPath(map.get(MetadataType.ALBUM_ART));
-            }
-            return this;
-        }
-
-        /**
-         * Builds a new metadata file with the previously specified fields.
-         *
-         * @return The metadata
-         */
-        public ConverterMetadata buildMetadata() {
-            return new ConverterMetadata(this.artist, this.title, this.createdBy, this.date, this.albumArtPath, this.bitrate);
-        }
-
-        /**
-         * Sets this metadata field.
-         *
-         * @param bitrate The bitrate of this file
-         * @return This builder, per <i>the builder pattern</i>
-         */
-        public ConverterMetadataBuilder bitrate(int bitrate) {
-            this.bitrate = bitrate;
-            return this;
-        }
-
-        /**
-         * Gets the bitrate of this track
-         *
-         * @return The bitrate
-         */
-        public int getBitrate() {
-            return this.bitrate;
-        }
-
-        /**
-         * Sets this metadata field.
-         *
-         * @param artist The metadata field to set
-         * @return This builder, per <i>the builder pattern</i>
-         */
-        public ConverterMetadataBuilder artist(String artist) {
-            this.artist = preferredTitleFormat(Objects.requireNonNull(artist));
-            return this;
-        }
-
-        /**
-         * Sets this metadata field.
-         *
-         * @param title The metadata field to set
-         * @return This builder, per <i>the builder pattern</i>
-         */
-        public ConverterMetadataBuilder title(String title) {
-            this.title = preferredTitleFormat(Objects.requireNonNull(title));
-            return this;
-        }
-
-        /**
-         * Sets this metadata field.
-         *
-         * @param createdBy The metadata field to set
-         * @return This builder, per <i>the builder pattern</i>
-         */
-        public ConverterMetadataBuilder createdBy(String createdBy) {
-            this.createdBy = preferredTitleFormat(Objects.requireNonNull(createdBy));
-            return this;
-        }
-
-        /**
-         * Sets this metadata field.
-         *
-         * @param date The metadata field to set
-         * @return This builder, per <i>the builder pattern</i>
-         */
-        public ConverterMetadataBuilder date(LocalDate date) {
-            this.date = date;
-            return this;
-        }
-
-        /**
-         * Sets this metadata field.
-         *
-         * @param albumArtPath The metadata field to set
-         * @return This builder, per <i>the builder pattern</i>
-         */
-        public ConverterMetadataBuilder albumArtPath(Path albumArtPath) {
-            this.albumArtPath = albumArtPath;
-            return this;
-        }
-
-        /**
-         * The getter for this field
-         *
-         * @return The field
-         */
-        public String getArtist() {
-            return this.artist;
-        }
-
-        /**
-         * The getter for this field
-         *
-         * @return The field
-         */
-        public String getTitle() {
-            return this.title;
-        }
-
-        /**
-         * The getter for this field
-         *
-         * @return The field
-         */
-        public String getCreatedBy() {
-            return this.createdBy;
-        }
-
-        /**
-         * The getter for this field
-         *
-         * @return The field
-         */
-        public LocalDate getDate() {
-            return this.date;
-        }
-
-        /**
-         * The getter for this field
-         *
-         * @return The field
-         */
-        public Path getAlbumArtPath() {
-            return this.albumArtPath;
-        }
-
-    }
-
-    /**
      * An enum representing a file extension.
      */
     public static enum FileExtension {
+        FLV {
+            @Override
+            public String toString() {
+                return ".flv";
+            }
+        },
         M4A {
             @Override
             public String toString() {

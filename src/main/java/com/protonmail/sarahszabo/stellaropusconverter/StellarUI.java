@@ -25,10 +25,13 @@ import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import javafx.application.Platform;
 import javafx.embed.swing.JFXPanel;
+import javafx.scene.control.Alert;
+import javafx.scene.control.ButtonType;
 import javafx.scene.control.ChoiceDialog;
 import javafx.scene.control.Dialog;
 import javafx.scene.control.TextInputDialog;
 import javafx.scene.image.Image;
+import javafx.scene.image.ImageView;
 import javafx.scene.input.Clipboard;
 import javafx.scene.layout.Region;
 import javafx.stage.DirectoryChooser;
@@ -79,6 +82,41 @@ public enum StellarUI {
         //Initialize Toolkit
         new JFXPanel();
         Platform.setImplicitExit(false);
+    }
+
+    /**
+     * Shows a confirmation dialog with the following text.
+     *
+     * @param text The content area text
+     * @return Whether or not the user agrees to continue the operation
+     */
+    public static boolean showConfirmationDialog(String text) {
+        try {
+            var queue = new ArrayBlockingQueue<Optional<ButtonType>>(1);
+            Platform.runLater(() -> {
+                try {
+                    var alert = new Alert(Alert.AlertType.CONFIRMATION);
+                    alert.setContentText(text);
+                    var stage = (Stage) alert.getDialogPane().getScene().getWindow();
+                    var image = new Image(Files.newInputStream(StellarDiskManager.SYSTEM_ICON), 300, 500, true, true);
+                    stage.getIcons().add(image);
+                    stage.setResizable(true);
+                    alert.setGraphic(new ImageView(image));
+                    var response = alert.showAndWait();
+                    queue.put(response);
+                } catch (InterruptedException ex) {
+                    Logger.getLogger(StellarUI.class.getName()).log(Level.SEVERE, null, ex);
+                    throw new RuntimeException(ex);
+                } catch (IOException ex) {
+                    Logger.getLogger(StellarUI.class.getName()).log(Level.SEVERE, null, ex);
+                }
+            });
+            var response = queue.take().orElse(ButtonType.CANCEL);
+            return response == ButtonType.YES || response == ButtonType.OK;
+        } catch (InterruptedException ex) {
+            Logger.getLogger(StellarUI.class.getName()).log(Level.SEVERE, null, ex);
+            throw new RuntimeException(ex);
+        }
     }
 
     /**
@@ -242,7 +280,7 @@ public enum StellarUI {
             } catch (InterruptedException ex) {
                 Logger.getLogger(StellarUI.class.getName()).log(Level.SEVERE, null, ex);
                 System.out.println("Interrupted while waiting for user input!");
-                StellarOPUSConverter.ConverterMetadataBuilder builder = new StellarOPUSConverter.ConverterMetadataBuilder();
+                ConverterMetadataBuilder builder = new ConverterMetadataBuilder();
                 list.add(builder.getArtist());
                 list.add(builder.getTitle());
             }

@@ -77,7 +77,7 @@ public final class ConverterMetadata {
 
     /**
      * {@link ConverterMetadata} objects are equal if and only if their artists
-     * and titles are the same.
+     * titles, and bitrates are the same.
      *
      * @param obj The other metadata object
      * @return Whether they are equal or not
