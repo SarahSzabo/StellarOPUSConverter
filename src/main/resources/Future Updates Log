@@ -1,0 +1,18 @@
+BUG FIXES:
+
+-Display List for Converted Files That aren't .mp4 does not Display Properly
+
+HIGH PRIORITY:
+-BUG: Fix Playlists not generating issue outside of Netbeans
+-YoutubeDL Support
+-Deprication & Removal of Obsolete Code
+
+MODERATE PRIORITY:
+-Transition to GUI
+-Performance Optimization & Inclusion of "Master" Folder (Essentially Finished), specifically optimization of playlist generation.
+
+LOW PRIORITY:
+-OPUSConverter -> Converter Hierarchy
+-Make Specific Converter Package
+-Prompt for a picture on a direct conversion (OPUS Converter Tree Diagram), upstream chooses which one.
+-Prompt for Deletion on ALL Conversions
