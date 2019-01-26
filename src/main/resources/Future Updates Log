@@ -16,3 +16,4 @@ LOW PRIORITY:
 -Make Specific Converter Package
 -Prompt for a picture on a direct conversion (OPUS Converter Tree Diagram), upstream chooses which one.
 -Prompt for Deletion on ALL Conversions
+-Make Space-Bridge CLI output nice and check logger output format.

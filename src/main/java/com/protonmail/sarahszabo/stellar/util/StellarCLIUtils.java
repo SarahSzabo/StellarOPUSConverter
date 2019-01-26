@@ -3,8 +3,9 @@
  * To change this template file, choose Tools | Templates
  * and open the template in the editor.
  */
-package com.protonmail.sarahszabo.stellar;
+package com.protonmail.sarahszabo.stellar.util;
 
+import com.protonmail.sarahszabo.stellar.StellarDiskManager;
 import com.protonmail.sarahszabo.stellar.metadata.ConverterMetadataBuilder;
 import com.protonmail.sarahszabo.stellar.metadata.MetadataType;
 import com.protonmail.sarahszabo.stellar.util.StellarGravitonField;
@@ -43,12 +44,12 @@ import javafx.util.Duration;
 import org.controlsfx.control.Notifications;
 
 /**
- * The UI for the Stellar OPUS Converter. Must be shutdown via
- * {@link StellarUI#shutdownUI()}.
+ * The UI for the Stellar OPUS Converter's command line interface. Must be
+ * shutdown via {@link StellarCLIUtils#shutdownUI()}.
  *
  * @author Sarah Szabo <PhysicistSarah@Gmail.com>
  */
-public enum StellarUI {
+public enum StellarCLIUtils {
     ;
     public static enum EXTENSION_FILTER {
         ALL {
@@ -107,16 +108,16 @@ public enum StellarUI {
                     var response = alert.showAndWait();
                     queue.put(response);
                 } catch (InterruptedException ex) {
-                    Logger.getLogger(StellarUI.class.getName()).log(Level.SEVERE, null, ex);
+                    Logger.getLogger(StellarCLIUtils.class.getName()).log(Level.SEVERE, null, ex);
                     throw new RuntimeException(ex);
                 } catch (IOException ex) {
-                    Logger.getLogger(StellarUI.class.getName()).log(Level.SEVERE, null, ex);
+                    Logger.getLogger(StellarCLIUtils.class.getName()).log(Level.SEVERE, null, ex);
                 }
             });
             var response = queue.take().orElse(ButtonType.CANCEL);
             return response == ButtonType.YES || response == ButtonType.OK;
         } catch (InterruptedException ex) {
-            Logger.getLogger(StellarUI.class.getName()).log(Level.SEVERE, null, ex);
+            Logger.getLogger(StellarCLIUtils.class.getName()).log(Level.SEVERE, null, ex);
             throw new RuntimeException(ex);
         }
     }
@@ -162,7 +163,7 @@ public enum StellarUI {
             stage.show();
             return stage;
         } catch (IOException ex) {
-            Logger.getLogger(StellarUI.class.getName()).log(Level.SEVERE, null, ex);
+            Logger.getLogger(StellarCLIUtils.class.getName()).log(Level.SEVERE, null, ex);
             throw new RuntimeException(ex);
         }
     }
@@ -190,13 +191,13 @@ public enum StellarUI {
                     setDialogIcon(dialog);
                     PATH_QUEUE.put(dialog.showAndWait());
                 } catch (InterruptedException | IOException ex) {
-                    Logger.getLogger(StellarUI.class.getName()).log(Level.SEVERE, null, ex);
+                    Logger.getLogger(StellarCLIUtils.class.getName()).log(Level.SEVERE, null, ex);
                 }
             });
             try {
                 return PATH_QUEUE.take();
             } catch (InterruptedException ex) {
-                Logger.getLogger(StellarUI.class.getName()).log(Level.SEVERE, null, ex);
+                Logger.getLogger(StellarCLIUtils.class.getName()).log(Level.SEVERE, null, ex);
                 throw new RuntimeException("Interrupted During Waiting for Path Queue");
             }
         }
@@ -215,13 +216,13 @@ public enum StellarUI {
                         PATH_LIST_QUEUE.put(Clipboard.getSystemClipboard().getFiles().stream().map(file -> file.toPath())
                                 .collect(Collectors.toList()));
                     } catch (InterruptedException ex) {
-                        Logger.getLogger(StellarUI.class.getName()).log(Level.SEVERE, null, ex);
+                        Logger.getLogger(StellarCLIUtils.class.getName()).log(Level.SEVERE, null, ex);
                     }
                 });
                 return Optional.of(PATH_LIST_QUEUE.take());
             }
         } catch (InterruptedException ex) {
-            Logger.getLogger(StellarUI.class.getName()).log(Level.SEVERE, null, ex);
+            Logger.getLogger(StellarCLIUtils.class.getName()).log(Level.SEVERE, null, ex);
         }
         return Optional.empty();
     }
@@ -260,7 +261,7 @@ public enum StellarUI {
                     setDialogIcon(dialog);
                     ASK_USER_METADATA.put(dialog.showAndWait());
                 } catch (InterruptedException | IOException ex) {
-                    Logger.getLogger(StellarUI.class.getName()).log(Level.SEVERE, null, ex);
+                    Logger.getLogger(StellarCLIUtils.class.getName()).log(Level.SEVERE, null, ex);
                 }
             });
             List<String> list = new ArrayList<>(2);
@@ -280,7 +281,7 @@ public enum StellarUI {
                     System.exit(0);
                 }
             } catch (InterruptedException ex) {
-                Logger.getLogger(StellarUI.class.getName()).log(Level.SEVERE, null, ex);
+                Logger.getLogger(StellarCLIUtils.class.getName()).log(Level.SEVERE, null, ex);
                 System.out.println("Interrupted while waiting for user input!");
                 ConverterMetadataBuilder builder = new ConverterMetadataBuilder();
                 list.add(builder.getArtist());
@@ -330,13 +331,13 @@ public enum StellarUI {
                 try {
                     PATH_QUEUE.put(file == null ? Optional.empty() : Optional.of(file.toPath()));
                 } catch (InterruptedException ex) {
-                    Logger.getLogger(StellarUI.class.getName()).log(Level.SEVERE, null, ex);
+                    Logger.getLogger(StellarCLIUtils.class.getName()).log(Level.SEVERE, null, ex);
                 }
             });
             try {
                 return PATH_QUEUE.take();
             } catch (InterruptedException ex) {
-                Logger.getLogger(StellarUI.class.getName()).log(Level.SEVERE, null, ex);
+                Logger.getLogger(StellarCLIUtils.class.getName()).log(Level.SEVERE, null, ex);
                 throw new RuntimeException(ex);
             }
         }
@@ -358,7 +359,7 @@ public enum StellarUI {
                 try {
                     PATH_QUEUE.put(Optional.of(file.toPath()));
                 } catch (InterruptedException ex) {
-                    Logger.getLogger(StellarUI.class.getName()).log(Level.SEVERE, null, ex);
+                    Logger.getLogger(StellarCLIUtils.class.getName()).log(Level.SEVERE, null, ex);
                 }
             });
             try {
@@ -392,7 +393,7 @@ public enum StellarUI {
                     }
                     PATH_LIST_QUEUE.put(files.stream().map(file -> file.toPath()).collect(Collectors.toList()));
                 } catch (InterruptedException ex) {
-                    Logger.getLogger(StellarUI.class.getName()).log(Level.SEVERE, null, ex);
+                    Logger.getLogger(StellarCLIUtils.class.getName()).log(Level.SEVERE, null, ex);
                 }
             });
             try {
@@ -401,7 +402,7 @@ public enum StellarUI {
                     return Optional.of(files);
                 }
             } catch (InterruptedException ex) {
-                Logger.getLogger(StellarUI.class.getName()).log(Level.SEVERE, null, ex);
+                Logger.getLogger(StellarCLIUtils.class.getName()).log(Level.SEVERE, null, ex);
                 System.err.println("Interrupted during waiting for file list!");
             }
             return Optional.empty();

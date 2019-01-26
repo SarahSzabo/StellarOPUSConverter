@@ -5,7 +5,11 @@
  */
 package com.protonmail.sarahszabo.stellar;
 
+import com.protonmail.sarahszabo.stellar.conversions.SpaceBridge;
+import com.protonmail.sarahszabo.stellar.conversions.StellarFFMPEGTimeStamp;
+import com.protonmail.sarahszabo.stellar.conversions.StellarOPUSConverter;
 import com.protonmail.sarahszabo.stellar.metadata.ConverterMetadataBuilder;
+import com.protonmail.sarahszabo.stellar.util.StellarCLIUtils;
 import com.protonmail.sarahszabo.stellar.util.StellarGravitonField;
 import static com.protonmail.sarahszabo.stellar.util.StellarGravitonField.*;
 import com.protonmail.sarahszabo.stellar.util.StellarGreatFilter;
@@ -65,7 +69,7 @@ public class Main {
                 StellarMode.GET_FROM_CLIPBOARD.start(args);
             } //Initiate Region Scan, Applying all filters from grand filter
             else if (args[0].equalsIgnoreCase("Region-Scan")) {
-                StellarGreatFilter.filterPaths(StellarUI.getFilesFromClipboard().get());
+                StellarGreatFilter.filterPaths(StellarCLIUtils.getFilesFromClipboard().get());
             } //Ask For Status of Folder Paths
             else if (args[0].equalsIgnoreCase("Status")) {
                 System.out.println(StellarDiskManager.DISKMANAGER.getState());
@@ -87,27 +91,27 @@ public class Main {
             }//Change Settings
             else if (args[0].equalsIgnoreCase("Set")) {
                 if (args[1].equalsIgnoreCase("Pictures-Folder")) {
-                    Path path = StellarUI.getFolderFor("Picture Folder")
+                    Path path = StellarCLIUtils.getFolderFor("Picture Folder")
                             .orElse(StellarDiskManager.USER_DIR);
                     StellarDiskManager.setPictureOutputFolder(path);
                     messageThenExit("Picture Folder Changed To:" + path);
                 } else if (args[1].equalsIgnoreCase("Output-Folder")) {
-                    Path path = StellarUI.getFolderFor("Output Folder")
+                    Path path = StellarCLIUtils.getFolderFor("Output Folder")
                             .orElse(StellarDiskManager.USER_DIR);
                     StellarDiskManager.setOutputFolder(path);
                     messageThenExit("Output Folder Changed To: " + path);
                 } else if (args[1].equalsIgnoreCase("Space-Bridge-Folder")) {
-                    Path path = StellarUI.getFolderFor("Space-Bridge Folder")
+                    Path path = StellarCLIUtils.getFolderFor("Space-Bridge Folder")
                             .orElse(StellarDiskManager.USER_DIR);
                     StellarDiskManager.setSpaceBridgeDirectory(path);
                     messageThenExit("Space-Bridge Folder Changed To: " + path);
                 } //Set Picture Metadata
                 if (args[1].equalsIgnoreCase("Album-Art")) {
-                    Path imageFile = StellarUI.getFile("Select an Image File",
-                            StellarUI.EXTENSION_FILTER.PICTURE_FILES).orElseGet(() -> {
+                    Path imageFile = StellarCLIUtils.getFile("Select an Image File",
+                            StellarCLIUtils.EXTENSION_FILTER.PICTURE_FILES).orElseGet(() -> {
                                 return StellarDiskManager.getGenericPicture();
                             });
-                    List<Path> files = StellarUI.getFilesFromClipboard().orElse(Collections.emptyList());
+                    List<Path> files = StellarCLIUtils.getFilesFromClipboard().orElse(Collections.emptyList());
                     if (files.isEmpty()) {
                         throw new IllegalStateException("Attempt to set album art with null clipboard opus file or null image selected");
                     }
@@ -143,7 +147,7 @@ public class Main {
         } else {
             printHelp();
         }
-        StellarUI.shutdownUI();
+        StellarCLIUtils.shutdownUI();
         System.exit(0);
     }
 
@@ -180,7 +184,7 @@ public class Main {
      * @return If it is a link
      */
     private static boolean argIsLink(String arg) {
-        return Files.exists(Paths.get(arg));
+        return Files.exists(Paths.get(arg)) || arg.contains("http");
     }
 
     /**

@@ -3,7 +3,7 @@
  * To change this template file, choose Tools | Templates
  * and open the template in the editor.
  */
-package com.protonmail.sarahszabo.stellar;
+package com.protonmail.sarahszabo.stellar.conversions;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
@@ -12,6 +12,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.fasterxml.jackson.module.paramnames.ParameterNamesModule;
+import com.protonmail.sarahszabo.stellar.StellarDiskManager;
 import com.protonmail.sarahszabo.stellar.metadata.ConverterMetadata;
 import com.protonmail.sarahszabo.stellar.util.StellarGravitonField;
 import static com.protonmail.sarahszabo.stellar.util.StellarGravitonField.*;

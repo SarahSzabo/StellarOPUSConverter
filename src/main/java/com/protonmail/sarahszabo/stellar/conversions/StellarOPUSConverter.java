@@ -3,8 +3,11 @@
  * To change this template file, choose Tools | Templates
  * and open the template in the editor.
  */
-package com.protonmail.sarahszabo.stellar;
+package com.protonmail.sarahszabo.stellar.conversions;
 
+import com.protonmail.sarahszabo.stellar.Main;
+import com.protonmail.sarahszabo.stellar.StellarDiskManager;
+import com.protonmail.sarahszabo.stellar.util.StellarCLIUtils;
 import com.protonmail.sarahszabo.stellar.metadata.ConverterMetadata;
 import com.protonmail.sarahszabo.stellar.metadata.ConverterMetadataBuilder;
 import com.protonmail.sarahszabo.stellar.metadata.MetadataType;
@@ -251,7 +254,7 @@ public class StellarOPUSConverter {
         //Artist/Title Cannot be Null
         if (isDefaultMetadata(MetadataType.ARTIST) || isDefaultMetadata(MetadataType.TITLE)) {
             if (!generateMetadata()) {
-                this.metadata.addAll(StellarUI.askUserForArtistTitle(applyFileNameFilters(this.originalFileNameNoEXTPreferred)));
+                this.metadata.addAll(StellarCLIUtils.askUserForArtistTitle(applyFileNameFilters(this.originalFileNameNoEXTPreferred)));
             }
         }
     }
@@ -478,7 +481,7 @@ public class StellarOPUSConverter {
      * @throws java.io.IOException If something happened
      */
     public Optional<Path> convertToOPUS(StellarFFMPEGTimeStamp start, StellarFFMPEGTimeStamp end) throws IOException {
-        this.metadata.addAll(StellarUI.askUserForArtistTitle("Filename: " + this.originalFilePath.getFileName()
+        this.metadata.addAll(StellarCLIUtils.askUserForArtistTitle("Filename: " + this.originalFilePath.getFileName()
                 + "\nStart: " + start + "\nEnd: " + end, ""));
         return convertToOPUS(this.metadata.getArtist(), this.metadata.getTitle(), start, end);
     }

@@ -17,7 +17,7 @@
 package com.protonmail.sarahszabo.stellar.metadata;
 
 import com.protonmail.sarahszabo.stellar.StellarDiskManager;
-import com.protonmail.sarahszabo.stellar.StellarOPUSConverter;
+import com.protonmail.sarahszabo.stellar.conversions.StellarOPUSConverter;
 import com.protonmail.sarahszabo.stellar.metadata.MetadataType;
 import com.protonmail.sarahszabo.stellar.util.StellarGravitonField;
 import java.nio.file.Path;

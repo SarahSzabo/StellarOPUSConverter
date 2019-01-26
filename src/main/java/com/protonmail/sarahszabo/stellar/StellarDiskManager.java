@@ -5,6 +5,8 @@
  */
 package com.protonmail.sarahszabo.stellar;
 
+import com.protonmail.sarahszabo.stellar.util.StellarCLIUtils;
+import com.protonmail.sarahszabo.stellar.conversions.StellarOPUSConverter;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
@@ -223,10 +225,10 @@ public enum StellarDiskManager {
             }
             if (Files.notExists(PREVIOUS_CONFIGURATION)) {
                 //Set Previous State, by default is the program folder
-                DiskManagerState state = new DiskManagerState(StellarUI.getFolderFor("Converted Files")
+                DiskManagerState state = new DiskManagerState(StellarCLIUtils.getFolderFor("Converted Files")
                         .orElse(USER_DIR),
-                        StellarUI.getFolderFor("Picture Folder").orElse(USER_DIR),
-                        StellarUI.getFolderFor("Space Bridge").orElse(USER_DIR));
+                        StellarCLIUtils.getFolderFor("Picture Folder").orElse(USER_DIR),
+                        StellarCLIUtils.getFolderFor("Space Bridge").orElse(USER_DIR));
                 mapper.writeValue(PREVIOUS_CONFIGURATION.toFile(), state);
                 logger.info("The output directory is now set to: " + state.getOutputFolder()
                         + "\nThe picture output directory is set to: " + state.getPictureOutputFolder());

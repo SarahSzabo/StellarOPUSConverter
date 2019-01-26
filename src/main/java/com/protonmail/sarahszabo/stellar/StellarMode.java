@@ -5,10 +5,17 @@
  */
 package com.protonmail.sarahszabo.stellar;
 
-import com.protonmail.sarahszabo.stellar.util.FileExtension;
-import com.protonmail.sarahszabo.stellar.metadata.ConverterMetadataBuilder;
+import com.protonmail.sarahszabo.stellar.conversions.SpaceBridge;
+import com.protonmail.sarahszabo.stellar.conversions.StellarFFMPEGTimeStamp;
+import com.protonmail.sarahszabo.stellar.conversions.StellarHyperspace;
+import com.protonmail.sarahszabo.stellar.conversions.StellarOPUSConverter;
 import com.protonmail.sarahszabo.stellar.metadata.ConverterMetadata;
+import com.protonmail.sarahszabo.stellar.metadata.ConverterMetadataBuilder;
 import com.protonmail.sarahszabo.stellar.metadata.MetadataType;
+import com.protonmail.sarahszabo.stellar.transmissions.Uplink;
+import com.protonmail.sarahszabo.stellar.transmissions.YoutubeUplink;
+import com.protonmail.sarahszabo.stellar.util.FileExtension;
+import com.protonmail.sarahszabo.stellar.util.StellarCLIUtils;
 import com.protonmail.sarahszabo.stellar.util.StellarLoggingFormatter;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -29,7 +36,8 @@ import javafx.application.Platform;
 import org.apache.commons.io.FileUtils;
 
 /**
- * An interface representing the mode that the converter is in.
+ * An interface representing the mode that the converter is in. Principally
+ * designed to be used in command line mode.
  *
  * @author Sarah Szabo <PhysicistSarah@Gmail.com>
  */
@@ -43,9 +51,9 @@ public enum StellarMode {
         @Override
         public void start(String... args) throws IOException {
             //Get From Clipboard
-            List<Path> paths = new ArrayList<>(StellarUI.getFilesFromClipboard().get());
+            List<Path> paths = new ArrayList<>(StellarCLIUtils.getFilesFromClipboard().get());
             //Select File From List
-            Path selected = StellarUI.selectPath(paths).orElseThrow(() -> new RuntimeException("Nothing Selected from path chooser!"));
+            Path selected = StellarCLIUtils.selectPath(paths).orElseThrow(() -> new RuntimeException("Nothing Selected from path chooser!"));
             //Remove Video Entry from Paths
             paths.remove(selected);
             //Convert Selected File Using Converter Methods to Generate Metadata for it, even if it is an .MP4
@@ -91,8 +99,19 @@ public enum StellarMode {
         @Override
         public void start(String... args) {
             try {
-                StellarOPUSConverter converter = new StellarOPUSConverter(Paths.get(args[0]));
-                converter.convertToOPUS();
+                //Determine if this is a web link or a file link
+                if (args[0].contains("http")) {
+                    //This is a web link!
+                    Uplink uplink = new YoutubeUplink(args[0]);
+                    uplink.recieveTransmission();
+                    //File is now on disk, convert
+                    StellarOPUSConverter converter = new StellarOPUSConverter(uplink.getPath());
+                    converter.convertToOPUS();
+                } else {
+                    //Regular file on disk!
+                    StellarOPUSConverter converter = new StellarOPUSConverter(Paths.get(args[0]));
+                    converter.convertToOPUS();
+                }
             } catch (IOException ex) {
                 Logger.getLogger(StellarMode.class.getName()).log(Level.SEVERE, null, ex);
                 printIOExceptionMessage();
@@ -155,7 +174,7 @@ public enum StellarMode {
     GET_FROM_CLIPBOARD {
         @Override
         public void start(String... args) {
-            doMultipleConversion(Optional.of(StellarUI.getFilesFromClipboard().get()));
+            doMultipleConversion(Optional.of(StellarCLIUtils.getFilesFromClipboard().get()));
         }
 
     },
@@ -165,7 +184,7 @@ public enum StellarMode {
     GRAPHICAL_FILE_CHOICE_DIRECT_LINKS {
         @Override
         public void start(String... args) {
-            doMultipleConversion(StellarUI.getFiles());
+            doMultipleConversion(StellarCLIUtils.getFiles());
         }
 
     },
@@ -176,7 +195,7 @@ public enum StellarMode {
     CLIPBOARD_SAME_ARTIST {
         @Override
         public void start(String... args) throws IOException {
-            printFileList(StellarHyperspace.runGeneralConversionTasks(StellarUI.getFilesFromClipboard().get().stream()
+            printFileList(StellarHyperspace.runGeneralConversionTasks(StellarCLIUtils.getFilesFromClipboard().get().stream()
                     .map(path -> toTaskFormat(path, args[1])).collect(Collectors.toList())));
         }
 
@@ -225,7 +244,7 @@ public enum StellarMode {
      * @param paths The collection of paths to delete
      */
     private static void deleteOriginalFiles(Collection<Path> paths) {
-        if (StellarUI.showConfirmationDialog("Delete Original Files? \n\n" + paths.toString())) {
+        if (StellarCLIUtils.showConfirmationDialog("Delete Original Files? \n\n" + paths.toString())) {
             for (var path : paths) {
                 FileUtils.deleteQuietly(path.toFile());
                 logger.info(path + " deleted!\n");

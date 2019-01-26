@@ -16,7 +16,7 @@
  */
 package com.protonmail.sarahszabo.stellar.tests;
 
-import com.protonmail.sarahszabo.stellar.StellarUI;
+import com.protonmail.sarahszabo.stellar.util.StellarCLIUtils;
 import org.junit.Assert;
 
 /**
@@ -30,7 +30,7 @@ public class StellarUITest {
 
     //@Test
     public void testConfirmationDIalog() {
-        Assert.assertTrue(StellarUI.showConfirmationDialog("Choose Something"));
+        Assert.assertTrue(StellarCLIUtils.showConfirmationDialog("Choose Something"));
     }
     // TODO add test methods here.
     // The methods must be annotated with annotation @Test. For example:
