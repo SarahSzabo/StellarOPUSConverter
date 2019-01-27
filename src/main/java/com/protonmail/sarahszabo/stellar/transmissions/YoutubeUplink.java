@@ -60,8 +60,8 @@ public final class YoutubeUplink implements Uplink {
      */
     @Override
     public boolean recieveTransmission() throws IOException {
-        Process process = new ProcessBuilder("youtube-dl", "-f", "best", "--newline", "-o", getPath().toString() + ".mp4",
-                this.url).inheritIO().start();
+        Process process = new ProcessBuilder("youtube-dl", "-f", "best", "--newline", "-o", getPath().toString(),
+                this.url).directory(StellarDiskManager.getOutputFolder().toFile()).inheritIO().start();
         try ( Scanner scanner = new Scanner(process.getInputStream())) {
             while (scanner.hasNextLine()) {
                 var str = scanner.nextLine();

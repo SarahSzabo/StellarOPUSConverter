@@ -56,7 +56,7 @@ public interface Uplink {
 
     /**
      * Gets the completed file path, if available. Keep in mind that the file
-     * may or may not exist.
+     * may or may not exist. This includes the file extension.
      *
      * @return The optional with the path
      * @throws java.io.IOException If something went wrong
