@@ -15,7 +15,6 @@ import com.fasterxml.jackson.module.paramnames.ParameterNamesModule;
 import com.protonmail.sarahszabo.stellar.StellarDiskManager;
 import com.protonmail.sarahszabo.stellar.metadata.ConverterMetadata;
 import com.protonmail.sarahszabo.stellar.util.StellarGravitonField;
-import static com.protonmail.sarahszabo.stellar.util.StellarGravitonField.*;
 import com.protonmail.sarahszabo.stellar.util.StellarLoggingFormatter;
 import java.io.IOException;
 import java.nio.file.FileVisitOption;
@@ -56,22 +55,7 @@ public enum SpaceBridge {
      * The path for space-bridge completed files. This is the home directory for
      * the copied file system.
      */
-    private static final Path COMPLETED;
-
-    /**
-     * The path for 320K bitrate opus files.
-     */
-    private static final Path COMPLETED320K;
-    /**
-     * The path for 190K bitrate opus files.
-     */
-    private static final Path COMPLETED190K;
-    /**
-     * The folder for re-indexing files in the
-     * {@link StellarDiskManager.DiskManagerState#getSpaceBridgeDirectory()}
-     * folder.
-     */
-    private static final Path reIndexingFolder;
+    private static final Path SB_COMPLETED;
     /**
      * The ledger used for new additions
      */
@@ -92,12 +76,12 @@ public enum SpaceBridge {
     /**
      * The path to the logging folder, which is used for storing logs.
      */
-    private static final Path LOGGING_FOLDER = newPath(StellarDiskManager.CONFIGURATION_FOLDER, "Log Files");
+    private static final Path LOGGING_FOLDER = StellarDiskManager.CONFIGURATION_FOLDER.resolve("Log Files");
     /**
      * The log file for space-bridge exceptions. Timestamped to avoid naming
      * conflicts.
      */
-    private static final Path EXCEPTION_LOG_PATH = newPath(LOGGING_FOLDER, "Space-Bridge Exception Log "
+    private static final Path EXCEPTION_LOG_PATH = LOGGING_FOLDER.resolve("Space-Bridge Exception Log "
             + StellarGravitonField.generateTimestampFileNameFriendly() + ".dat");
 
     /**
@@ -117,13 +101,8 @@ public enum SpaceBridge {
             //The directory we're watching
             watching = state.getSpaceBridgeDirectory();
             //Our completed files go here
-            COMPLETED = newPath(watching, "Space-Bridge Completed");
-            COMPLETED320K = newPath(COMPLETED, "320K");
-            COMPLETED190K = newPath(COMPLETED, "190K");
-            Files.createDirectories(COMPLETED320K);
-            Files.createDirectories(COMPLETED190K);
+            SB_COMPLETED = watching.resolve("Space-Bridge Completed");
             SB_EXCEPTION_LOGGER = StellarLoggingFormatter.forTitle("Space-Bridge", EXCEPTION_LOG_PATH);
-            reIndexingFolder = newPath(StellarDiskManager.getState().getSpaceBridgeDirectory(), "Space-Bridge ReIndexing");
             logger.log(Level.INFO, "Space-Bridge Initial Setup Complete!");
             Runtime.getRuntime().addShutdownHook(new Thread(() -> {
                 try {
@@ -149,122 +128,44 @@ public enum SpaceBridge {
      * @param outputDirectory The base directory to output the files to
      * @return The mirrored path
      */
-    private Path getCopyPath(Path current, Path outputDirectory) {
+    private Path getCopyPath(Path current) {
         //If watching is a/b and current is a/b/c/d, get path for SpaceBridge/c/d
-        return newPath(outputDirectory, watching.relativize(current));
+        return SB_COMPLETED.resolve(watching.relativize(current));
     }
 
     /**
-     * Gets a stream for the walk path for the watched directory minus
-     * Space-Bridge folders. Excludes all directories and only gets a stream of
-     * path files.
-     *
-     * @return The stream
-     * @param outputFolder The folder to create files/folders in
-     * @throws IOException If something went wrong
-     */
-    private Stream<Path> fileWalkFilterDuplicatesOnlyFiles(Path outputFolder) throws IOException {
-        return fileWalkFilterDuplicates(outputFolder).parallel().filter(path
-                -> !Files.isDirectory(path) && !path.getFileName().toString().startsWith("."));
-    }
-
-    /**
-     * Gets a stream for the walk path for the watched directory minus
-     * Space-Bridge folders.
-     *
-     * @return The stream
-     * @param outputFolder The folder to create files/folders in
-     * @throws IOException If something went wrong
-     */
-    private Stream<Path> fileWalkFilterDuplicates(Path outputFolder) throws IOException {
-        //Ensure no duplicates in both folders
-        return Files.walk(watching, FileVisitOption.FOLLOW_LINKS).parallel()
-                .filter(path -> !path.startsWith(outputFolder) && !path.startsWith(reIndexingFolder) && !path.startsWith(COMPLETED));
-    }
-
-    /**
-     * Checks whether or not the file exists in the space-bridge folder. NOTE:
-     * Only .opus files are allowed in the space-bridge folder.
-     *
-     * @param path The path of the file
-     * @return Whether or not the file exists in the space-bridge folder
-     */
-    private boolean existInSpaceBridge(Path path, Path outputFolder) {
-        //Replace Possible Other Filenames, All Files are Just .opus in the Space-Bridge Directory
-        //Strip Extension
-        String fileName = preferredTitleFormat(StellarGravitonField.stripFileExtension(path));
-        //Does this path exist in the copy directory?
-        Path newPath = getCopyPath(newPath(path.getParent(), fileName + ".opus"), outputFolder);
-        logger.fine("Space-Bridge Path: " + newPath);
-        logger.fine("Original: " + path);
-        logger.fine("Exists? " + Files.exists(newPath));
-        return Files.exists(newPath);
-    }
-
-    /**
-     * Mirrors the directories between the watching folder and the specified
-     * outputFolder.
-     *
-     * @param outputFolder The folder to create files/folders in
-     * @throws IOException If something went wrong
-     */
-    private void mirrorDirectories(Path outputFolder) throws IOException {
-        //Mirror Directories
-        fileWalkFilterDuplicates(outputFolder).filter(path -> Files.isDirectory(path)).forEach(folder -> {
-            try {
-                Path folderPath = getCopyPath(folder, outputFolder);
-                Files.createDirectories(folderPath);
-                logger.log(Level.INFO, "Created Folder: " + folderPath + "\n");
-            } catch (IOException ex) {
-                SB_EXCEPTION_LOGGER.log(Level.SEVERE, "Init Bridge, Create Directories", ex);
-                throw new RuntimeException(ex);
-            }
-        });
-    }
-
-    /**
-     * Initiates the conversion processes and generates playlists for 320K &
-     * 190K.
+     * Initiates the conversion processes and generates playlists for the
+     * library.
      *
      * @throws java.io.IOException If something happened
      */
     public void initBridge() throws IOException {
-        logger.log(Level.INFO, "\n\nAbout to Mirror Directories");
-        mirrorDirectories(COMPLETED320K);
-        mirrorDirectories(COMPLETED190K);
-        logger.log(Level.INFO, "\n\nDirectory Mirroring Process Complete");
-        logger.log(Level.INFO, "\n\nAbout to Mirror And Convert Files to lower bitrate");
-        //Check if Converted Files Exist Already, if Not Convert Them
-        //No Directories, File Must be newPath expected file type, File Should Not Already Be Indexed
-        //Filtering by just 320K is ok because they are always created together
-        fileWalkFilterDuplicatesOnlyFiles(COMPLETED).filter(path -> !existInSpaceBridge(path, COMPLETED320K))
+        logger.log(Level.INFO, "\n\nSpace-Bridge Initiation");
+        //Begin file walk
+        Files.walk(watching, FileVisitOption.FOLLOW_LINKS).parallel()
+                //Not a directory, not IN the SB directory, & filename isn't already in the completed folder
+                .filter(path -> !Files.isDirectory(path) && !path.startsWith(SB_COMPLETED)
+                && Files.notExists(getCopyPath(path)))
+                //Main loop, copy everything over in a parallel fasion
                 .forEach(filePath -> {
                     Future<Path> future = StellarHyperspace.getHyperspace().submit(() -> {
                         try {
-                            //Doesn't Exist in Destination, Convert to 320K & 190K
-                            Path destination = getCopyPath(filePath, COMPLETED320K).getParent();
-                            StellarOPUSConverter converter = new StellarOPUSConverter(filePath, destination);
-                            Path path = converter.convertToOPUS().orElseThrow(() -> new IOException("Error in Processing <320K>" + filePath));
-                            LEDGER.add(new SBDatapacket(path));
-                            logger.log(Level.INFO, "\nFile Convertion Complete <320K>: " + path + "\n");
-                            destination = getCopyPath(filePath, COMPLETED190K).getParent();
-                            converter = new StellarOPUSConverter(filePath, destination, converter.getMetadata());
-                            path = converter.convertToOPUS(190).orElseThrow(() -> new IOException("Error in Processing <190K>" + filePath));
-                            LEDGER.add(new SBDatapacket(path));
-                            logger.log(Level.INFO, "\nFile Convertion Complete <190K>: " + path + "\n");
-                            return path;
+                            //Define destination of copy operation
+                            Path destination = getCopyPath(filePath);
+                            //Create Directories for this file if they don't exist already
+                            if (Files.notExists(destination.getParent())) {
+                                Files.createDirectories(destination.getParent());
+                            }
+                            //Doesn't Exist in Destination, Copy Over
+                            Files.copy(filePath, getCopyPath(filePath), StandardCopyOption.COPY_ATTRIBUTES,
+                                    StandardCopyOption.REPLACE_EXISTING);
+                            logger.log(Level.INFO, "<Space-Bridge>: \nCopied: " + filePath + "\n To: " + destination);
+                            LEDGER.add(new SBDatapacket(destination));
+                            return destination;
                         } catch (IOException ex) {
                             Logger.getLogger(SpaceBridge.class.getName()).log(Level.SEVERE, null, ex);
-                            try {
-                                //Some exception in the process, just copy the file over to the directory, best we can do
-                                Files.copy(filePath, getCopyPath(filePath, COMPLETED),
-                                        StandardCopyOption.COPY_ATTRIBUTES, StandardCopyOption.REPLACE_EXISTING);
-                                SB_EXCEPTION_LOGGER.severe("Encountered an unconvertable file: " + filePath.toAbsolutePath() + " & just copied it");
-                                return getCopyPath(filePath, COMPLETED);
-                            } catch (IOException ex1) {
-                                SB_EXCEPTION_LOGGER.log(Level.SEVERE, null, ex1);
-                                throw new RuntimeException(ex1);
-                            }
+                            throw new RuntimeException("We were unable to copy: " + filePath + "\n during the space-bridge operation."
+                                    + " The disk might be full or some other I/O related error.", ex);
                         }
                     });
                 });
@@ -274,8 +175,7 @@ public enum SpaceBridge {
         logger.info("Hyperspace Shutdown Complete!");
         logger.info("About to Generate Temporal Playlists");
         //Init Playlists
-        generateTemporalPlaylists(COMPLETED320K);
-        generateTemporalPlaylists(COMPLETED190K);
+        generateTemporalPlaylists(SB_COMPLETED);
         logger.info("Temporal Playlist Generation Complete!");
     }
 
@@ -292,98 +192,6 @@ public enum SpaceBridge {
     }
 
     /**
-     * Checks a path to see if its metadata attribute title matches the
-     * space-bridge title.
-     *
-     * @param path The path to investigate
-     * @return Whether or not this is true
-     */
-    private boolean filterByFileNameExistance(Path path) {
-        return existInSpaceBridge(path, reIndexingFolder);
-    }
-
-    /**
-     * Checks a path to see if its metadata attribute title matches the
-     * space-bridge title.
-     *
-     * @param path The path to investigate
-     * @return Whether or not this is true
-     * @throws IOException If something went wrong
-     */
-    private boolean filterByFileNamePattern(Path path) {
-        //Or could exist in the filename metadata format itself
-        return existInSpaceBridge(newPath(path.getParent(),
-                StellarOPUSConverter.generateMetadata(path).getTitle() + ".opus"),
-                reIndexingFolder);
-    }
-
-    /**
-     * Checks a path to see if its metadata attribute title matches the
-     * space-bridge title.
-     *
-     * @param path The path to investigate
-     * @return Whether or not this is true
-     * @throws IOException If something went wrong
-     */
-    private boolean filterByFileAttributes(Path path) {
-        try {
-            //Could be Author - Title or have title field set in metadata attribute fields
-            return existInSpaceBridge(newPath(path.getParent(),
-                    StellarDiskManager.getMetadata(path).getTitle() + ".opus"), reIndexingFolder);
-        } catch (RuntimeException ex) {
-            Logger.getLogger(SpaceBridge.class.getName()).log(Level.SEVERE, null, ex);
-            SB_EXCEPTION_LOGGER.log(Level.SEVERE, null, ex);
-            throw new RuntimeException(ex);
-        }
-    }
-
-    /**
-     * Initiates the ReIndexing bridge which uses
-     * {@link StellarOPUSConverter#reIndexOPUSFile()} to apply the latest
-     * version of conversion options to older .opus libraries. Doesn't generate
-     * playlists.
-     *
-     * @param bitrate The bitrate for the converted files
-     * @throws java.io.IOException If something went wrong
-     */
-    public void initReIndexingBridge(int bitrate) throws IOException {
-        logger.info("About to Mirror Directories");
-        //Mirror Directories, We'll do this in the ReIndexing Folder
-        mirrorDirectories(reIndexingFolder);
-        logger.info("Dirctory Mirroring Complete!");
-        //Reindex All Files & Put them in the ReIndexing Folder
-        //If either one exists in space-bridge folder, the overall statement is false, do not convert this file
-        fileWalkFilterDuplicatesOnlyFiles(reIndexingFolder).filter(path
-                -> !(filterByFileNameExistance(path) || filterByFileNamePattern(path)))
-                .forEach(path -> {
-                    Future<Path> future = StellarHyperspace.getHyperspace().submit(() -> {
-                        try {
-                            StellarOPUSConverter converter = new StellarOPUSConverter(path, getCopyPath(path, reIndexingFolder).getParent());
-                            Path completedFilePath = converter.convertToOPUS(bitrate).orElseThrow(() -> new IOException("Error in Processing"));
-                            logger.log(Level.INFO, "\nFile Convertion Complete: " + path + "\n");
-                            return completedFilePath;
-                        } catch (IOException ex) {
-                            Logger.getLogger(SpaceBridge.class.getName()).log(Level.SEVERE, null, ex);
-                            try {
-                                //Some exception in the process, just copy the file over to the directory, best we can do
-                                Files.copy(path, getCopyPath(path, reIndexingFolder),
-                                        StandardCopyOption.COPY_ATTRIBUTES, StandardCopyOption.REPLACE_EXISTING);
-                                SB_EXCEPTION_LOGGER.severe("Encountered an unconvertable file: " + path.toAbsolutePath() + " & just copied it");
-                                return getCopyPath(path, reIndexingFolder);
-                            } catch (IOException ex1) {
-                                SB_EXCEPTION_LOGGER.log(Level.SEVERE, null, ex1);
-                                throw new RuntimeException(ex1);
-                            }
-                        }
-                    });
-                });
-        //All work completed
-        logger.info("Shutting Down ReIndexing Bridge");
-        shutdownBridge();
-        logger.info("Shutdown Complete!");
-    }
-
-    /**
      * Generates all temporal playlists. Temporal playlists are playlists that
      * contain files from the library that were created in a certain time
      * period. Folders must be set up/exist prior to calling this subroutine.
@@ -392,10 +200,10 @@ public enum SpaceBridge {
      * where the freshly converted .opus files are
      */
     private static void generateTemporalPlaylists(Path root) throws IOException {
-        //Ledger is Already Set Up for New Data, get new data that is for our root (320K/190K) playlist and add it to ledger file
+        //Ledger is Already Set Up for New Data, get new data that is for our root playlist and add it to ledger file
         List<SBDatapacket> ledger;
         //Define Overall Playlist Folder
-        Path playlistFolder = root.resolve("Playlists");
+        Path playlistFolder = root.resolve("Temporal Playlists");
         for (PLAYLIST playlist : PLAYLIST.values()) {
             //Define Current Playlist Folder
             Path currentPlaylistFolder = playlistFolder.resolve(playlist.toString());
@@ -602,7 +410,7 @@ public enum SpaceBridge {
          * @return The path to the folder of this playlist
          */
         public Path getPath(Path root) {
-            return newPath(root, toString());
+            return root.resolve(toString());
         }
 
         /**

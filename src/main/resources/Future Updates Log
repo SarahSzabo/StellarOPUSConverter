@@ -3,13 +3,16 @@ BUG FIXES:
 -Display List for Converted Files That aren't .mp4 does not Display Properly
 
 HIGH PRIORITY:
--BUG: Fix Playlists not generating issue outside of Netbeans
--YoutubeDL Support
+-If file is in Artist - Filename format, ignore exiftool (Generates Artwork Properly?)
+-YoutubeDL Support (Timestamps)
 -Deprication & Removal of Obsolete Code
+-YoutubeUplink -> Send Downloaded Video to Temp Folder, Not Output Folder
+-Make All/FFMPEG Commands not have to copy the file to convert over to the temp folder
 
 MODERATE PRIORITY:
 -Transition to GUI
 -Performance Optimization & Inclusion of "Master" Folder (Essentially Finished), specifically optimization of playlist generation.
+-Implement Control Groups as a way of controlling performance
 
 LOW PRIORITY:
 -OPUSConverter -> Converter Hierarchy
@@ -17,3 +20,5 @@ LOW PRIORITY:
 -Prompt for a picture on a direct conversion (OPUS Converter Tree Diagram), upstream chooses which one.
 -Prompt for Deletion on ALL Conversions
 -Make Space-Bridge CLI output nice and check logger output format.
+-Platform Independent Performance Controls?
+-Performance Profiles

@@ -78,7 +78,7 @@
                     <archive>
                         <manifest>
                             <addClasspath>true</addClasspath>
-                            <mainClass>com.protonmail.sarahszabo.stellaropusconverter.Main</mainClass>
+                            <mainClass>com.protonmail.sarahszabo.stellar.Main</mainClass>
                         </manifest>
                     </archive>
                 </configuration>

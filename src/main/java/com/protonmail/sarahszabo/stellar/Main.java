@@ -5,7 +5,6 @@
  */
 package com.protonmail.sarahszabo.stellar;
 
-import com.protonmail.sarahszabo.stellar.conversions.SpaceBridge;
 import com.protonmail.sarahszabo.stellar.conversions.StellarFFMPEGTimeStamp;
 import com.protonmail.sarahszabo.stellar.conversions.StellarOPUSConverter;
 import com.protonmail.sarahszabo.stellar.metadata.ConverterMetadataBuilder;
@@ -139,8 +138,6 @@ public class Main {
             //Manually Specify Author/Title with Timestamps
             if (argIsLink(args[0]) && !allStringsAreTimestamps(args)) {
                 stellarConversion(StellarMode.LINK_AUTHOR_TITLE, args);
-            } else if (args[0].equalsIgnoreCase("Space-Bridge") && args[1].equalsIgnoreCase("ReIndex")) {
-                SpaceBridge.SPACE_BRIDGE.initReIndexingBridge(Integer.valueOf(args[2]));
             } else {
                 printHelp();
             }
