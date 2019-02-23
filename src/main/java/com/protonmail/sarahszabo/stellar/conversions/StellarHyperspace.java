@@ -5,7 +5,7 @@
  */
 package com.protonmail.sarahszabo.stellar.conversions;
 
-import com.protonmail.sarahszabo.stellar.conversions.StellarOPUSConverter;
+import com.protonmail.sarahszabo.stellar.conversions.converters.StellarOPUSConverter;
 import java.nio.file.Path;
 import java.util.Collection;
 import java.util.List;

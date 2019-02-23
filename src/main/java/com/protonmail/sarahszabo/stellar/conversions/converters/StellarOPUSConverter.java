@@ -3,15 +3,16 @@
  * To change this template file, choose Tools | Templates
  * and open the template in the editor.
  */
-package com.protonmail.sarahszabo.stellar.conversions;
+package com.protonmail.sarahszabo.stellar.conversions.converters;
 
 import com.protonmail.sarahszabo.stellar.Main;
 import com.protonmail.sarahszabo.stellar.StellarDiskManager;
-import com.protonmail.sarahszabo.stellar.util.StellarCLIUtils;
+import com.protonmail.sarahszabo.stellar.conversions.StellarFFMPEGTimeStamp;
 import com.protonmail.sarahszabo.stellar.metadata.ConverterMetadata;
 import com.protonmail.sarahszabo.stellar.metadata.ConverterMetadataBuilder;
 import com.protonmail.sarahszabo.stellar.metadata.MetadataType;
 import com.protonmail.sarahszabo.stellar.util.FileExtension;
+import com.protonmail.sarahszabo.stellar.util.StellarCLIUtils;
 import com.protonmail.sarahszabo.stellar.util.StellarGravitonField;
 import static com.protonmail.sarahszabo.stellar.util.StellarGravitonField.*;
 import com.protonmail.sarahszabo.stellar.util.StellarGreatFilter;
@@ -299,8 +300,10 @@ public class StellarOPUSConverter {
     public Optional<Path> convertToOPUS(int bitrate) throws IOException {
         //If Metadata not modified from default, generate metadata
         if (isDefaultMetadata(MetadataType.TITLE) && isDefaultMetadata(MetadataType.ARTIST)) {
-            generateTitleArtist();
             return convertToOPUS(this.metadata.getArtist(), this.metadata.getTitle());
+        } //If this matches the ARTIST -- FILENAME pattern, ignore artist/title tags
+        else if (this.originalFileNameNoEXT.matches(".*/s*-/s*.*")) {
+            generateMetadata();
         }
         return Optional.of(toOpusFile(bitrate));
     }
@@ -418,7 +421,7 @@ public class StellarOPUSConverter {
                 "--title", metadata.getTitle(),
                 "--artist", metadata.getArtist(),
                 "--picture", metadata.getAlbumArtPath().toAbsolutePath().toString(),
-                "--comment", MetadataType.DATE.toString() + "=" + metadata.getDate().format(DATE_FORMATTER),
+                "--comment", MetadataType.DATE.toString() + "=" + metadata.getStellarIndexDate().format(DATE_FORMATTER),
                 "--comment", metadata.getCreatedBy()
         );
         //If we have metadata title, return that as the filename

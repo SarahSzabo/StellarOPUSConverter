@@ -8,7 +8,7 @@ package com.protonmail.sarahszabo.stellar;
 import com.protonmail.sarahszabo.stellar.conversions.SpaceBridge;
 import com.protonmail.sarahszabo.stellar.conversions.StellarFFMPEGTimeStamp;
 import com.protonmail.sarahszabo.stellar.conversions.StellarHyperspace;
-import com.protonmail.sarahszabo.stellar.conversions.StellarOPUSConverter;
+import com.protonmail.sarahszabo.stellar.conversions.converters.StellarOPUSConverter;
 import com.protonmail.sarahszabo.stellar.metadata.ConverterMetadata;
 import com.protonmail.sarahszabo.stellar.metadata.ConverterMetadataBuilder;
 import com.protonmail.sarahszabo.stellar.metadata.MetadataType;

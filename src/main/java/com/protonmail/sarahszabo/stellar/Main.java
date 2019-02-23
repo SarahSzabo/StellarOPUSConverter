@@ -6,7 +6,7 @@
 package com.protonmail.sarahszabo.stellar;
 
 import com.protonmail.sarahszabo.stellar.conversions.StellarFFMPEGTimeStamp;
-import com.protonmail.sarahszabo.stellar.conversions.StellarOPUSConverter;
+import com.protonmail.sarahszabo.stellar.conversions.converters.StellarOPUSConverter;
 import com.protonmail.sarahszabo.stellar.metadata.ConverterMetadataBuilder;
 import com.protonmail.sarahszabo.stellar.util.StellarCLIUtils;
 import com.protonmail.sarahszabo.stellar.util.StellarGravitonField;
@@ -190,6 +190,7 @@ public class Main {
     private static void printHelp() throws IOException {
         String message = StellarDiskManager.readHelpText();
         message += "\n\n" + StellarDiskManager.getState();
+        message += "\n\n" + Main.FULL_PROGRAM_NAME;
         messageThenExit(message);
     }
 

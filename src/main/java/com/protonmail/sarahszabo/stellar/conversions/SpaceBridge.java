@@ -35,7 +35,6 @@ import org.apache.commons.io.FileUtils;
 
 /**
  * A class that oversees conversions in a certain folder and converts them to
- * 190K mobile formats or 320K for typical libraries, also manages temporal
  * playlists.
  *
  * @author Sarah Szabo <SarahSzabo@Protonmail.com>
@@ -56,6 +55,11 @@ public enum SpaceBridge {
      * the copied file system.
      */
     private static final Path SB_COMPLETED;
+
+    /**
+     * The folder for the temporal playlists.
+     */
+    private static final Path PLAYLIST_FOLDER;
     /**
      * The ledger used for new additions
      */
@@ -102,6 +106,7 @@ public enum SpaceBridge {
             watching = state.getSpaceBridgeDirectory();
             //Our completed files go here
             SB_COMPLETED = watching.resolve("Space-Bridge Completed");
+            PLAYLIST_FOLDER = SB_COMPLETED.resolve("Temporal Playlists");
             SB_EXCEPTION_LOGGER = StellarLoggingFormatter.forTitle("Space-Bridge", EXCEPTION_LOG_PATH);
             logger.log(Level.INFO, "Space-Bridge Initial Setup Complete!");
             Runtime.getRuntime().addShutdownHook(new Thread(() -> {
@@ -175,7 +180,7 @@ public enum SpaceBridge {
         logger.info("Hyperspace Shutdown Complete!");
         logger.info("About to Generate Temporal Playlists");
         //Init Playlists
-        generateTemporalPlaylists(SB_COMPLETED);
+        generateTemporalPlaylists();
         logger.info("Temporal Playlist Generation Complete!");
     }
 
@@ -199,14 +204,12 @@ public enum SpaceBridge {
      * @param root The root folder to generate the playlists in, should also be
      * where the freshly converted .opus files are
      */
-    private static void generateTemporalPlaylists(Path root) throws IOException {
+    private static void generateTemporalPlaylists() throws IOException {
         //Ledger is Already Set Up for New Data, get new data that is for our root playlist and add it to ledger file
         List<SBDatapacket> ledger;
-        //Define Overall Playlist Folder
-        Path playlistFolder = root.resolve("Temporal Playlists");
         for (PLAYLIST playlist : PLAYLIST.values()) {
             //Define Current Playlist Folder
-            Path currentPlaylistFolder = playlistFolder.resolve(playlist.toString());
+            Path currentPlaylistFolder = PLAYLIST_FOLDER.resolve(playlist.toString());
             //Folders Are Already Set Up, But we Need to Make the Current Playlists Folder
             Files.createDirectories(currentPlaylistFolder);
             Path ledgerPath = currentPlaylistFolder.resolve(LEDGER_FILENAME);
@@ -223,16 +226,20 @@ public enum SpaceBridge {
                     ledger = Collections.emptyList();
                 } else {
                     //There Were Previous Entries, Generate New Ledger
-                    ledger = Files.walk(root, FileVisitOption.FOLLOW_LINKS).parallel()
-                            .filter(path -> !path.startsWith(playlistFolder) && !Files.isDirectory(path)).map(SBDatapacket::new)
+                    ledger = Files.walk(SB_COMPLETED, FileVisitOption.FOLLOW_LINKS).parallel()
+                            .filter(path -> !path.startsWith(PLAYLIST_FOLDER) && !Files.isDirectory(path)).map(SBDatapacket::new)
                             .collect(Collectors.toList());
                 }
                 //Make Ledger
                 Files.createFile(ledgerPath);
             }
-            List<SBDatapacket> combined = Stream.concat(LEDGER.stream(), ledger.stream()).collect(Collectors.toList());
+            List<SBDatapacket> combined = Stream.concat(LEDGER.stream(), ledger.stream())
+                    //There might be files not converted by Stellar, these files won't have our stellar specific date field,
+                    //so we can't sort them by time of indexing, and they must be excluded.
+                    .filter(datapacket -> !datapacket.getMetadata().getStellarIndexDate()
+                    .equals(ConverterMetadata.getDefaultMetadata().getStellarIndexDate())).collect(Collectors.toList());
             //Copy Current Entries to Current Playlist
-            combined.stream().filter(data -> !Files.isDirectory(data.getPath())
+            combined.parallelStream().filter(data -> !Files.isDirectory(data.getPath())
                     && playlist.isInCurrentDateRange(data)).map(SBDatapacket::getPath)
                     .forEach(path -> {
                         try {
@@ -268,6 +275,11 @@ public enum SpaceBridge {
         @JsonProperty(value = "metadata")
         private final ConverterMetadata metadata;
 
+        /**
+         * Creates a {@link SBDatapacket} with the specified path.
+         *
+         * @param path The path of the file to record
+         */
         public SBDatapacket(Path path) {
             this.path = path;
             this.metadata = StellarDiskManager.getMetadata(path);
@@ -421,7 +433,7 @@ public enum SpaceBridge {
          * @return Whether or not this is true
          */
         public boolean isInCurrentDateRange(SBDatapacket wrapper) {
-            return isInCurrentDateRange(wrapper.getMetadata().getDate());
+            return isInCurrentDateRange(wrapper.getMetadata().getStellarIndexDate());
         }
 
         /**

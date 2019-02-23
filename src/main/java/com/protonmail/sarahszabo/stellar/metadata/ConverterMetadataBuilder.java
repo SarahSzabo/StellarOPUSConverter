@@ -17,8 +17,7 @@
 package com.protonmail.sarahszabo.stellar.metadata;
 
 import com.protonmail.sarahszabo.stellar.StellarDiskManager;
-import com.protonmail.sarahszabo.stellar.conversions.StellarOPUSConverter;
-import com.protonmail.sarahszabo.stellar.metadata.MetadataType;
+import com.protonmail.sarahszabo.stellar.conversions.converters.StellarOPUSConverter;
 import com.protonmail.sarahszabo.stellar.util.StellarGravitonField;
 import java.nio.file.Path;
 import java.time.LocalDate;
@@ -54,7 +53,7 @@ public class ConverterMetadataBuilder {
         this.artist = StellarGravitonField.preferredTitleFormat(Objects.requireNonNull(metadata.getArtist()));
         this.title = StellarGravitonField.preferredTitleFormat(Objects.requireNonNull(metadata.getTitle()));
         this.createdBy = StellarGravitonField.preferredTitleFormat(Objects.requireNonNull(metadata.getCreatedBy()));
-        this.date = Objects.requireNonNull(metadata.getDate());
+        this.date = Objects.requireNonNull(metadata.getStellarIndexDate());
         this.albumArtPath = Objects.requireNonNull(metadata.getAlbumArtPath());
         this.bitrate = metadata.getBitrate();
     }
@@ -87,7 +86,7 @@ public class ConverterMetadataBuilder {
         this.artist = ConverterMetadata.DEFAULT_METADATA.getArtist();
         this.title = ConverterMetadata.DEFAULT_METADATA.getTitle();
         this.createdBy = ConverterMetadata.DEFAULT_METADATA.getCreatedBy();
-        this.date = ConverterMetadata.DEFAULT_METADATA.getDate();
+        this.date = ConverterMetadata.DEFAULT_METADATA.getStellarIndexDate();
         this.albumArtPath = ConverterMetadata.DEFAULT_METADATA.getAlbumArtPath();
         return this;
     }
@@ -104,8 +103,8 @@ public class ConverterMetadataBuilder {
         if (metadata.getCreatedBy() != null && !ConverterMetadata.isDefaultMetadata(MetadataType.CREATED_BY, metadata)) {
             this.createdBy = StellarGravitonField.preferredTitleFormat(metadata.getCreatedBy());
         }
-        if (metadata.getDate() != null && !ConverterMetadata.isDefaultMetadata(MetadataType.DATE, metadata)) {
-            this.date = metadata.getDate();
+        if (metadata.getStellarIndexDate() != null && !ConverterMetadata.isDefaultMetadata(MetadataType.DATE, metadata)) {
+            this.date = metadata.getStellarIndexDate();
         }
         if (metadata.getAlbumArtPath() != null && !ConverterMetadata.isDefaultMetadata(MetadataType.ALBUM_ART, metadata)) {
             this.albumArtPath = metadata.getAlbumArtPath();
@@ -144,7 +143,10 @@ public class ConverterMetadataBuilder {
      * @return The built metadata
      */
     public ConverterMetadata buildMetadata() {
-        return new ConverterMetadata(StellarGravitonField.preferredTitleFormat(this.artist), StellarGravitonField.preferredTitleFormat(this.title), StellarGravitonField.preferredTitleFormat(this.createdBy), this.date, this.albumArtPath.equals(ConverterMetadata.DEFAULT_METADATA.getAlbumArtPath()) ? StellarDiskManager.getGenericPicture() : this.albumArtPath, this.bitrate);
+        return new ConverterMetadata(StellarGravitonField.preferredTitleFormat(this.artist),
+                StellarGravitonField.preferredTitleFormat(this.title), StellarGravitonField.preferredTitleFormat(this.createdBy),
+                this.date, this.albumArtPath.equals(ConverterMetadata.DEFAULT_METADATA.getAlbumArtPath())
+                ? StellarDiskManager.getGenericPicture() : this.albumArtPath, this.bitrate);
     }
 
     /**

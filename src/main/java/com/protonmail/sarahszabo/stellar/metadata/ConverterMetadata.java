@@ -64,7 +64,7 @@ public final class ConverterMetadata {
         } else if (type == MetadataType.CREATED_BY) {
             return metadata.getCreatedBy().equalsIgnoreCase(getDefaultMetadata().getCreatedBy());
         } else if (type == MetadataType.DATE) {
-            return metadata.getDate().equals(getDefaultMetadata().getDate());
+            return metadata.getStellarIndexDate().equals(getDefaultMetadata().getStellarIndexDate());
         } else if (type == MetadataType.BITRATE) {
             return metadata.getBitrate() == ConverterMetadata.DEFAULT_METADATA.getBitrate();
         } //Is default metadata if is equal to the default album art, or is a generic picture
@@ -174,11 +174,12 @@ public final class ConverterMetadata {
     }
 
     /**
-     * Gets the date metadata field.
+     * Gets the date metadata field. This date represents the date that Stellar
+     * indexed the file.
      *
      * @return The date metadata field
      */
-    public LocalDate getDate() {
+    public LocalDate getStellarIndexDate() {
         return this.date;
     }
 

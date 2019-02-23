@@ -6,7 +6,7 @@
 package com.protonmail.sarahszabo.stellar;
 
 import com.protonmail.sarahszabo.stellar.util.StellarCLIUtils;
-import com.protonmail.sarahszabo.stellar.conversions.StellarOPUSConverter;
+import com.protonmail.sarahszabo.stellar.conversions.converters.StellarOPUSConverter;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
