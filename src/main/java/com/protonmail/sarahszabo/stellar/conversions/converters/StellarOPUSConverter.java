@@ -299,11 +299,11 @@ public class StellarOPUSConverter {
      */
     public Optional<Path> convertToOPUS(int bitrate) throws IOException {
         //If Metadata not modified from default, generate metadata
-        if (isDefaultMetadata(MetadataType.TITLE) && isDefaultMetadata(MetadataType.ARTIST)) {
-            return convertToOPUS(this.metadata.getArtist(), this.metadata.getTitle());
-        } //If this matches the ARTIST -- FILENAME pattern, ignore artist/title tags
-        else if (this.originalFileNameNoEXT.matches(".*/s*-/s*.*")) {
+        //Or If this matches the ARTIST -- FILENAME pattern, ignore artist/title tags then proceed.
+        if ((isDefaultMetadata(MetadataType.TITLE) && isDefaultMetadata(MetadataType.ARTIST))
+                || this.originalFileNameNoEXT.matches(".*/s*-/s*.*")) {
             generateMetadata();
+            return convertToOPUS(this.metadata.getArtist(), this.metadata.getTitle());
         }
         return Optional.of(toOpusFile(bitrate));
     }
@@ -556,7 +556,9 @@ public class StellarOPUSConverter {
      * @return Returns true if the metadata generation was successful
      */
     private boolean generateMetadata() {
-        this.metadata.addAll(generateMetadataFromRegex(this.originalFilePath, "-", "|", "/"));
+        ConverterMetadata metadata = generateMetadataFromRegex(this.originalFilePath, "-", "|", "/");
+        this.metadata.artist(metadata.getArtist());
+        this.metadata.title(metadata.getTitle());
         this.opusFileName = preferredTitleFormat(this.metadata.getTitle() + ".opus");
         this.opusFilePath = this.outputFolder.resolve(this.opusFileName);
         //Only Return True if Both Are Not Default
