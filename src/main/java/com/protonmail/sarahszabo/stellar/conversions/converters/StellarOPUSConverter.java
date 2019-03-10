@@ -178,7 +178,7 @@ public class StellarOPUSConverter {
         }
         this.originalFileNameNoEXTPreferred = preferredTitleFormat(this.originalFileNameNoEXT);
         this.opusFileName = preferredTitleFormat(this.originalFileNameNoEXTPreferred + ".opus");
-        this.opusFilePath = newPath(this.outputFolder, this.opusFileName);
+        this.opusFilePath = this.outputFolder.resolve(this.opusFileName);
         //Define Metadata Before Metadata Generation
         this.metadata = new ConverterMetadataBuilder(Objects.requireNonNull(metadata));
     }
@@ -301,7 +301,7 @@ public class StellarOPUSConverter {
         //If Metadata not modified from default, generate metadata
         //Or If this matches the ARTIST -- FILENAME pattern, ignore artist/title tags then proceed.
         if ((isDefaultMetadata(MetadataType.TITLE) && isDefaultMetadata(MetadataType.ARTIST))
-                || this.originalFileNameNoEXT.matches(".*/s*-/s*.*")) {
+                || this.originalFilePath.getFileName().toString().matches(".*\\s*-+\\s*.*")) {
             generateMetadata();
             return convertToOPUS(this.metadata.getArtist(), this.metadata.getTitle());
         }
@@ -414,16 +414,32 @@ public class StellarOPUSConverter {
         this.metadata.createdBy(CREATED_BY_TAG + "=" + Main.FULL_PROGRAM_NAME);
         //Set Bitrate if Not Already Set
         this.metadata.bitrate(isDefaultMetadata(MetadataType.BITRATE) ? bitrate : this.metadata.getBitrate());
+        //Figure out if we had previous tags or not, if we did, don't write duplicates
+        ConverterMetadata previousMetadata = StellarDiskManager.getMetadata(originalFilePath);
+        boolean previousTags = !ConverterMetadata.isDefaultMetadata(MetadataType.TITLE, previousMetadata)
+                || !ConverterMetadata.isDefaultMetadata(MetadataType.ARTIST, previousMetadata);
         //Build Metadata
         ConverterMetadata metadata = this.metadata.buildMetadata();
-        processOP(true, "opusenc", flacFile.getFileName().toString(), title,
-                "--bitrate", bitrate + "k",
-                "--title", metadata.getTitle(),
-                "--artist", metadata.getArtist(),
-                "--picture", metadata.getAlbumArtPath().toAbsolutePath().toString(),
-                "--comment", MetadataType.DATE.toString() + "=" + metadata.getStellarIndexDate().format(DATE_FORMATTER),
-                "--comment", metadata.getCreatedBy()
-        );
+        //Did we have previous artist/title tags? Don't duplicate them!
+        if (previousTags) {
+            processOP(true, "opusenc", flacFile.getFileName().toString(), title,
+                    "--bitrate", bitrate + "k",
+                    "--picture", metadata.getAlbumArtPath().toAbsolutePath().toString(),
+                    "--comment", MetadataType.DATE.toString() + "=" + metadata.getStellarIndexDate().format(DATE_FORMATTER),
+                    "--comment", metadata.getCreatedBy()
+            );
+        } //No previous tags to worry about, continue as usual
+        else {
+            processOP(true, "opusenc", flacFile.getFileName().toString(), title,
+                    "--bitrate", bitrate + "k",
+                    "--title", metadata.getTitle(),
+                    "--artist", metadata.getArtist(),
+                    "--picture", metadata.getAlbumArtPath().toAbsolutePath().toString(),
+                    "--comment", MetadataType.DATE.toString() + "=" + metadata.getStellarIndexDate().format(DATE_FORMATTER),
+                    "--comment", metadata.getCreatedBy()
+            );
+        }
+
         //If we have metadata title, return that as the filename
         String fileTitle = this.metadata.getTitle().equalsIgnoreCase(ConverterMetadata.getDefaultMetadata().getTitle())
                 ? this.opusFileName : this.metadata.getTitle() + ".opus";

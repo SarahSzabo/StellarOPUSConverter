@@ -25,18 +25,6 @@ public final class ConverterMetadata {
      */
     public static final ConverterMetadata DEFAULT_METADATA = new ConverterMetadata("Unknown Artist",
             "Unknown Title", Main.FULL_PROGRAM_NAME, LocalDate.MAX, StellarGravitonField.newPath(""), Integer.MAX_VALUE);
-    @JsonProperty
-    private final String artist;
-    @JsonProperty
-    private final String title;
-    @JsonProperty
-    private final String createdBy;
-    @JsonProperty
-    private final LocalDate date;
-    @JsonProperty
-    private final Path albumArtPath;
-    @JsonProperty
-    private final int bitrate;
 
     /**
      * Gets the default metadata instance.
@@ -75,6 +63,18 @@ public final class ConverterMetadata {
             throw new IllegalStateException("Unrecognized Metadata Option");
         }
     }
+    @JsonProperty
+    private final String artist;
+    @JsonProperty
+    private final String title;
+    @JsonProperty
+    private final String createdBy;
+    @JsonProperty
+    private final LocalDate stellarIndexDate;
+    @JsonProperty
+    private final Path albumArtPath;
+    @JsonProperty
+    private final int bitrate;
 
     /**
      * Constructs a new {@link ConverterMetadata} with the specified arguments.
@@ -91,12 +91,12 @@ public final class ConverterMetadata {
     @JsonCreator
     public ConverterMetadata(@JsonProperty(value = "artist") String artist,
             @JsonProperty(value = "title") String title, @JsonProperty(value = "createdBy") String createdBy,
-            @JsonProperty(value = "date") LocalDate date, @JsonProperty(value = "albumArtPath") Path albumArtPath,
+            @JsonProperty(value = "stellarIndexDate") LocalDate date, @JsonProperty(value = "albumArtPath") Path albumArtPath,
             @JsonProperty(value = "bitrate") int bitrate) {
         this.artist = Objects.requireNonNull(artist);
         this.title = Objects.requireNonNull(title);
         this.createdBy = Objects.requireNonNull(createdBy);
-        this.date = Objects.requireNonNull(date);
+        this.stellarIndexDate = Objects.requireNonNull(date);
         this.albumArtPath = Objects.requireNonNull(albumArtPath);
         if (artist.isEmpty() || title.isEmpty()) {
             throw new IllegalArgumentException("Artist or title is empty");
@@ -108,19 +108,18 @@ public final class ConverterMetadata {
 
     @Override
     public int hashCode() {
-        int hash = 7;
-        hash = 67 * hash + Objects.hashCode(this.artist);
-        hash = 67 * hash + Objects.hashCode(this.title);
-        hash = 67 * hash + this.bitrate;
+        int hash = 3;
+        hash = 79 * hash + Objects.hashCode(this.artist);
+        hash = 79 * hash + Objects.hashCode(this.title);
         return hash;
     }
 
     /**
      * {@link ConverterMetadata} objects are equal if and only if their artists
-     * titles, and bitrates are the same.
+     * and titles are the same.
      *
-     * @param obj The other metadata object
-     * @return Whether they are equal or not
+     * @param obj The object to compare
+     * @return Whether or not the two are equal
      */
     @Override
     public boolean equals(Object obj) {
@@ -134,9 +133,6 @@ public final class ConverterMetadata {
             return false;
         }
         final ConverterMetadata other = (ConverterMetadata) obj;
-        if (this.bitrate != other.bitrate) {
-            return false;
-        }
         if (!Objects.equals(this.artist, other.artist)) {
             return false;
         }
@@ -180,7 +176,7 @@ public final class ConverterMetadata {
      * @return The date metadata field
      */
     public LocalDate getStellarIndexDate() {
-        return this.date;
+        return this.stellarIndexDate;
     }
 
     /**
