@@ -23,14 +23,6 @@ public class StellarDiskManagerTest {
 
     @Test
     public void testExifprocess() throws IOException {
-        //File Located at /home/sarah/Aero.opus
-        Path path = StellarGravitonField.newPath("Test Files", "Aero.txt");
-        ProcessBuilder builder = new ProcessBuilder("exiftool", "Aero.opus").directory(StellarGravitonField.newPath("", "Test Files").toFile())
-                .inheritIO();
-        builder.redirectOutput(path.toFile());
-        Process process = builder.start();
-        assertTrue(Files.exists(path));
-        Files.deleteIfExists(path);
     }
 
     /**

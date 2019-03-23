@@ -170,6 +170,16 @@ public class ConverterMetadataBuilder {
     }
 
     /**
+     * Compares whether or not the metadata when built is equal to
+     * {@link ConverterMetadata#DEFAULT_METADATA}.
+     *
+     * @return The boolean value
+     */
+    public boolean isDefaultMetadata() {
+        return this.buildMetadata().equals(ConverterMetadata.DEFAULT_METADATA);
+    }
+
+    /**
      * Sets this metadata field.
      *
      * @param artist The metadata field to set

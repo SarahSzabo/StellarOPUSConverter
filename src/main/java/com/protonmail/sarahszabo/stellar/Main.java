@@ -32,7 +32,7 @@ public class Main {
     /**
      * The version of the program.
      */
-    public static final String VERSION = "1.4.2α";
+    public static final String VERSION = "1.4.21α";
     /**
      * The name of the program.
      */

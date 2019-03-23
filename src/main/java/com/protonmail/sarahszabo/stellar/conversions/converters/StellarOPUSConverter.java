@@ -28,6 +28,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Stack;
 import java.util.logging.ConsoleHandler;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -248,16 +249,11 @@ public class StellarOPUSConverter {
     }
 
     /**
-     * Generates the title and artist from the filename format, or else asks the
-     * user for the information.
+     * Asks the user for the information about the title and artist and sets the
+     * metadata with it.
      */
     private void generateTitleArtist() {
-        //Artist/Title Cannot be Null
-        if (isDefaultMetadata(MetadataType.ARTIST) || isDefaultMetadata(MetadataType.TITLE)) {
-            if (!generateMetadata()) {
-                this.metadata.addAll(StellarCLIUtils.askUserForArtistTitle(applyFileNameFilters(this.originalFileNameNoEXTPreferred)));
-            }
-        }
+        this.metadata.addAll(StellarCLIUtils.askUserForArtistTitle(applyFileNameFilters(this.originalFileNameNoEXTPreferred)));
     }
 
     /**
@@ -274,20 +270,6 @@ public class StellarOPUSConverter {
     }
 
     /**
-     * Converts the selected file to .OPUS. Doesn't attempt to edit the
-     * filename, or automatically generate metadata aside for the title, which
-     * is set to the title of the track.
-     *
-     * @return The file path newPath the .opus file.
-     * @throws IOException If something went wrong
-     */
-    public Optional<Path> convertToOPUSNoAutomaticMetadata() throws IOException {
-        this.metadata.artist(ConverterMetadata.getDefaultMetadata().getArtist());
-        this.metadata.title(this.originalFileNameNoEXT);
-        return convertToOPUS(this.metadata.getArtist(), this.metadata.getTitle());
-    }
-
-    /**
      * Converts the selected file to .OPUS. Makes a best effort to get the title
      * name and artist name from the filename. Works if the filename looks like
      * MyTitle -- MyTrack.mp4. If the metadata has been set, this subroutine
@@ -298,14 +280,24 @@ public class StellarOPUSConverter {
      * @throws IOException If something went wrong
      */
     public Optional<Path> convertToOPUS(int bitrate) throws IOException {
-        //If Metadata not modified from default, generate metadata
-        //Or If this matches the ARTIST -- FILENAME pattern, ignore artist/title tags then proceed.
-        if ((isDefaultMetadata(MetadataType.TITLE) && isDefaultMetadata(MetadataType.ARTIST))
-                || this.originalFilePath.getFileName().toString().matches(".*\\s*-+\\s*.*")) {
+        //If this matches the ARTIST -- FILENAME pattern, generate metadata from filename
+        if (this.originalFilePath.getFileName().toString().matches(".*\\s*-+\\s*.*")) {
             generateMetadata();
-            return convertToOPUS(this.metadata.getArtist(), this.metadata.getTitle());
+        }//If we don't have tags, and don't have ARTIST - TITLE format, ask user
+        else if (this.metadata.isDefaultMetadata()) {
+            generateTitleArtist();
         }
-        return Optional.of(toOpusFile(bitrate));
+        //If we have either tags, or one of the above, we're good, do conversion operation
+        final Stack<Path> stack = new Stack<>();
+        copyOP(() -> {
+            try {
+                stack.push(toOpusFile(bitrate));
+            } catch (IOException ex) {
+                Logger.getLogger(StellarOPUSConverter.class.getName()).log(Level.SEVERE, null, ex);
+                throw new IllegalStateException("Conversion " + this.originalFilePath + " was unsuccessful.", ex);
+            }
+        });
+        return Optional.of(stack.pop());
     }
 
     /**
@@ -319,18 +311,6 @@ public class StellarOPUSConverter {
      */
     public Optional<Path> convertToOPUS() throws IOException {
         return convertToOPUS(320);
-    }
-
-    /**
-     * Converts the selected file to .OPUS.
-     *
-     * @param artist The track artist
-     * @param title The track title
-     * @return The Path to the converted File
-     * @throws IOException If something happened
-     */
-    public Optional<Path> convertToOPUS(String artist, String title) throws IOException {
-        return convertToOPUS(artist, title, 320);
     }
 
     /**
@@ -399,6 +379,7 @@ public class StellarOPUSConverter {
      * @throws IOException If something went wrong
      */
     private Path toOpusFile(int bitrate, StellarFFMPEGTimeStamp start, StellarFFMPEGTimeStamp end) throws IOException {
+        processImage();
         Path flacFile = start == null || end == null ? toFlacFile() : toFlacFile(start, end);
         //Delete Intermediate .opus File Before Running New .opus Conversion
         Files.deleteIfExists(newPath(StellarDiskManager.getTempDirectory(), this.opusFileName));
@@ -420,8 +401,8 @@ public class StellarOPUSConverter {
                 || !ConverterMetadata.isDefaultMetadata(MetadataType.ARTIST, previousMetadata);
         //Build Metadata
         ConverterMetadata metadata = this.metadata.buildMetadata();
-        //Did we have previous artist/title tags? Don't duplicate them!
-        if (previousTags) {
+        //Did we have previous artist/title tags? Don't duplicate them! Not Needed for .opus
+        if (previousTags && this.fileExtension != FileExtension.OPUS) {
             processOP(true, "opusenc", flacFile.getFileName().toString(), title,
                     "--bitrate", bitrate + "k",
                     "--picture", metadata.getAlbumArtPath().toAbsolutePath().toString(),
@@ -450,31 +431,6 @@ public class StellarOPUSConverter {
     }
 
     /**
-     * Converts the selected file to .OPUS.
-     *
-     * @param artist The track artist
-     * @param title The track title
-     * @param bitrate The bitrate newPath the resultant audio in K, so 320 =
-     * 320K
-     * @return The Path to the converted File
-     * @throws IOException If something happened
-     */
-    public Optional<Path> convertToOPUS(String artist, String title, int bitrate) throws IOException {
-        copyOP(() -> {
-            try {
-                //Create Image
-                processImage();
-                //Encode new .opus file using metadata set from .flac file & image in pictures folder
-                toOpusFile(bitrate, null, null);
-            } catch (IOException ex) {
-                Logger.getLogger(StellarOPUSConverter.class.getName()).log(Level.SEVERE, null, ex);
-                this.logger.log(Level.SEVERE, "Error encountered during conversion", ex);
-            }
-        });
-        return Optional.of(newPath(StellarDiskManager.getOutputFolder(), title + ".opus"));
-    }
-
-    /**
      * An iterated version newPath
      * {@link Objects#requireNonNull(java.lang.Object)}
      *
@@ -491,68 +447,20 @@ public class StellarOPUSConverter {
 
     /**
      * Makes a best effort to find the metadata Author and Title from the
-     * filename, and tags the opus file with it. The opus file generated is
+     * filename, and tags the opus file with it.The opus file generated is
      * within start and end times specified.
      *
      * @param start The start time newPath the recording window
      * @param end The end newPath the recording window
+     * @param bitrate The bitrate to use
      * @return The path to the newly created file
      * @throws java.io.IOException If something happened
      */
-    public Optional<Path> convertToOPUS(StellarFFMPEGTimeStamp start, StellarFFMPEGTimeStamp end) throws IOException {
+    public Optional<Path> convertToOPUS(StellarFFMPEGTimeStamp start, StellarFFMPEGTimeStamp end, int bitrate) throws IOException {
+        //Ask user for information about this time region of the larger file
         this.metadata.addAll(StellarCLIUtils.askUserForArtistTitle("Filename: " + this.originalFilePath.getFileName()
                 + "\nStart: " + start + "\nEnd: " + end, ""));
-        return convertToOPUS(this.metadata.getArtist(), this.metadata.getTitle(), start, end);
-    }
-
-    /**
-     * Converts the selected file to .OPUS. Time start and end are expected to
-     * be newPath the form HH:MM:SS. So: 00:01:23 with nothing else in the
-     * string.
-     *
-     * @param artist The track artist
-     * @param title The track title
-     * @param start The starting time
-     * @param end The end time
-     * @return The path to the newly created file
-     * @throws IOException If something happened
-     * @throws IllegalArgumentException If start or end is not in the specified
-     * format, or if start is less than or equal to zero.
-     */
-    public Optional<Path> convertToOPUS(String artist, String title, StellarFFMPEGTimeStamp start, StellarFFMPEGTimeStamp end) throws IOException {
-        return convertToOPUS(320, artist, title, start, end);
-    }
-
-    /**
-     * Converts the selected file to .OPUS. Time start and end are expected to
-     * be newPath the form HH:MM:SS. So: 00:01:23 with nothing else in the
-     * string.
-     *
-     * @param bitrate The bitrate in K
-     * @param artist The track artist
-     * @param title The track title
-     * @param start The starting time
-     * @param end The end time
-     * @return The path to the newly created file
-     * @throws IOException If something happened
-     * @throws IllegalArgumentException If start or end is not in the specified
-     * format, or if start is less than or equal to zero.
-     */
-    public Optional<Path> convertToOPUS(int bitrate, String artist, String title, StellarFFMPEGTimeStamp start, StellarFFMPEGTimeStamp end)
-            throws IOException {
-        requireNonNullIterated(artist, title, start, end);
-        if (artist.isEmpty() || title.isEmpty()) {
-            throw new IllegalArgumentException("One of the fields is empty!");
-        }
-        if (start.compareTo(end) >= 0) {
-            throw new IllegalArgumentException("Start is less than or equal to end!");
-        }
-        //Were we a part newPath the constructor chain? If not, set metadata
-        if (this.metadata.buildMetadata().equals(ConverterMetadata.getDefaultMetadata())) {
-            this.metadata.artist(artist);
-            this.metadata.title(title);
-        }
-        //ffmpeg -ss 00:00:24.0 -i 40.mp4 -t 00:01:20.0 -y -b:a 320k 40.opus
+        //Cut out the audio and convert it to .opus
         copyOP(() -> {
             try {
                 processImage();
@@ -561,8 +469,7 @@ public class StellarOPUSConverter {
                 Logger.getLogger(StellarOPUSConverter.class.getName()).log(Level.SEVERE, null, ex);
             }
         });
-        toOpusFile(bitrate, start, end);
-        return Optional.of(newPath(StellarDiskManager.getOutputFolder(), title + ".opus"));
+        return Optional.of(StellarDiskManager.getOutputFolder().resolve(this.metadata.getTitle() + ".opus"));
     }
 
     /**
@@ -597,7 +504,7 @@ public class StellarOPUSConverter {
 
     /**
      * Performs an operation after first copying the target file over to the
-     * temp directory.
+     * temp directory. Then copies the TITLE.opus file back.
      *
      * @param operation The operations to perform
      * @throws IOException If something happened

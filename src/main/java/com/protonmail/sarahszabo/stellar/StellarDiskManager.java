@@ -287,6 +287,16 @@ public enum StellarDiskManager {
             outputFolder = state.getOutputFolder();
             pictureOutputFolder = state.getPictureOutputFolder();
             spaceBridgeDirectory = state.getSpaceBridgeDirectory();
+            //Check to Make Sure That All Paths Actually Exist, They Might Have Changed While We Were Asleep
+            if (Files.notExists(outputFolder)) {
+                logger.log(Level.SEVERE, "Non Existant Output Folder: {0}", outputFolder.toString());
+            }
+            if (Files.notExists(pictureOutputFolder)) {
+                logger.log(Level.SEVERE, "Non Existant Picture Folder: {0}", pictureOutputFolder.toString());
+            }
+            if (Files.notExists(spaceBridgeDirectory)) {
+                logger.log(Level.SEVERE, "Non Existant Space-Bridge Folder: {0}", spaceBridgeDirectory.toString());
+            }
             //Create Temp Directory & Set Deletion Hook
             tempDirectory = Files.createTempDirectory("Stellar OPUS Converter Temporary Directory");
             Runtime.getRuntime().addShutdownHook(new Thread(() -> {

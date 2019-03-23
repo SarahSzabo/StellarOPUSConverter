@@ -139,7 +139,7 @@ public enum StellarMode {
                     //Add conversion tasks to list for conversion
                     taskList.add(() -> {
                         StellarOPUSConverter converter = new StellarOPUSConverter(path);
-                        return converter.convertToOPUS(s, e).get();
+                        return converter.convertToOPUS(s, e, 320).get();
                     });
                 } else {
                     start = timestamps.get(i);
@@ -164,8 +164,9 @@ public enum StellarMode {
     LINK_AUTHOR_TITLE {
         @Override
         public void start(String... args) throws IOException {
-            StellarOPUSConverter converter = new StellarOPUSConverter(Paths.get(args[0]));
-            converter.convertToOPUS(args[1], args[2]);
+            StellarOPUSConverter converter = new StellarOPUSConverter(Paths.get(args[0]),
+                    new ConverterMetadataBuilder().artist(args[1]).title(args[2]).buildMetadata());
+            converter.convertToOPUS();
         }
     },
     /**
@@ -206,8 +207,9 @@ public enum StellarMode {
          */
         private Callable<Path> toTaskFormat(Path filePath, String artist) {
             return () -> {
-                StellarOPUSConverter converter = new StellarOPUSConverter(filePath);
-                return converter.convertToOPUS(artist, FileExtension.stripFileExtension(filePath)).get();
+                StellarOPUSConverter converter = new StellarOPUSConverter(filePath,
+                        new ConverterMetadataBuilder().artist(artist).title(FileExtension.stripFileExtension(filePath)).buildMetadata());
+                return converter.convertToOPUS().get();
             };
         }
     };

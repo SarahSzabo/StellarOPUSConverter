@@ -13,10 +13,12 @@ HIGH PRIORITY:
 -If a file doesn't have Stellar Conversion Date Stamp, Don't Include In Playlists
 
 MODERATE PRIORITY:
+-Make Space-Bridge Only Generate Temporal Playlists Instead of Copying Over Everything
 -Transition to GUI
 -Implement Control Groups as a way of controlling performance
 
 LOW PRIORITY:
+-Add ALBUM as a metadata tag for new conversions & After Second Comma in -CL menu/direct conversions
 -Prompt for a picture on a direct conversion (OPUS Converter Tree Diagram), upstream chooses which one.
 -Prompt for Deletion on ALL Conversions
 -Make Space-Bridge CLI output nice and check logger output format.

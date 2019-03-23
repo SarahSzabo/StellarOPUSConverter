@@ -104,6 +104,9 @@ public final class ConverterMetadata {
             throw new IllegalArgumentException("Created By is empty");
         }
         this.bitrate = bitrate;
+        if (this.bitrate <= 0) {
+            throw new IllegalArgumentException("Bitrate is at or below 0");
+        }
     }
 
     @Override
