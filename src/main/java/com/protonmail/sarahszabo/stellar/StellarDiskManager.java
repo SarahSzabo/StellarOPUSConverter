@@ -11,11 +11,14 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.databind.exc.InvalidDefinitionException;
 import com.fasterxml.jackson.databind.exc.UnrecognizedPropertyException;
+import com.fasterxml.jackson.databind.module.SimpleModule;
 import com.protonmail.sarahszabo.stellar.metadata.ConverterMetadata;
 import com.protonmail.sarahszabo.stellar.metadata.ConverterMetadataBuilder;
 import com.protonmail.sarahszabo.stellar.metadata.MetadataType;
+import com.protonmail.sarahszabo.stellar.util.PathDeserializer;
 import com.protonmail.sarahszabo.stellar.util.StellarGravitonField;
 import static com.protonmail.sarahszabo.stellar.util.StellarGravitonField.*;
 import com.protonmail.sarahszabo.stellar.util.StellarLoggingFormatter;
@@ -186,7 +189,8 @@ public enum StellarDiskManager {
                     metadata.createdBy(comment);
                 } else if (contents.matches("Encoder Options\\s+")) {
                     //Data is always after the : character
-                    int bitrate = Integer.parseInt(str.split("--bitrate ")[1].replace('k', ' ').trim());
+                    int bitrate = Integer.parseInt(str.split("--bitrate ")[1].replace('k', ' ').replace('K', ' ').trim()
+                    );
                     //Map Behaviour overwrites existing entry
                     metadata.bitrate(bitrate);
                 }
@@ -218,6 +222,10 @@ public enum StellarDiskManager {
      * @throws IOException If something happened
      */
     private static DiskManagerState initialSetUp() throws IOException {
+        SimpleModule pathModule = new SimpleModule("Path Deserializer");
+        pathModule.addKeyDeserializer(Path.class, new PathDeserializer());
+        mapper.registerModule(pathModule);
+        mapper.enable(SerializationFeature.INDENT_OUTPUT);
         try {
             //If File Doesn't Exist Create it & Set Default State
             if (Files.notExists(CONFIGURATION_FOLDER)) {

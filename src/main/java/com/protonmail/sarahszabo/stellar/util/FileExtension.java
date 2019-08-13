@@ -46,6 +46,12 @@ public enum FileExtension {
         public String toString() {
             return ".ogg";
         }
+    },
+    WEBM {
+        @Override
+        public String toString() {
+            return ".webm";
+        }
     }, /**
      * Already Existing OPUS Files. The bitrate option does not apply here since
      * we are copying the bitrate over.

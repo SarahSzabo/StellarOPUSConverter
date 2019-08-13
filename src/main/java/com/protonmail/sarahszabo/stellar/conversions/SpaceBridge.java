@@ -9,9 +9,6 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
-import com.fasterxml.jackson.module.paramnames.ParameterNamesModule;
 import com.protonmail.sarahszabo.stellar.StellarDiskManager;
 import com.protonmail.sarahszabo.stellar.metadata.ConverterMetadata;
 import com.protonmail.sarahszabo.stellar.util.StellarGravitonField;
@@ -24,7 +21,9 @@ import java.nio.file.StandardCopyOption;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.Future;
 import java.util.logging.Level;
@@ -55,20 +54,14 @@ public enum SpaceBridge {
      * the copied file system.
      */
     private static final Path SB_COMPLETED;
-
     /**
-     * The folder for the temporal playlists.
+     * The ledger used for mapping the entire library for the temporal playlists
      */
-    private static final Path PLAYLIST_FOLDER;
-    /**
-     * The ledger used for new additions
-     */
-    private static final List<SBDatapacket> LEDGER = new ArrayList<>(1500);
+    private static final Map<Path, ConverterMetadata> LIBRARY_LEDGER = new HashMap<>(1500);
     /**
      * The filename and extension of the playlist ledger.
      */
-    private static final String LEDGER_FILENAME = "Playlist Ledger.dat";
-
+    private static final Path LIBRARY_LEDGER_PATH;
     /**
      * The object mapper for mapping SB objects.
      */
@@ -98,15 +91,12 @@ public enum SpaceBridge {
      */
     static {
         try {
-            MAPPER.registerModule(new ParameterNamesModule());
-            MAPPER.registerModule(new Jdk8Module());
-            MAPPER.registerModule(new JavaTimeModule()); // new module, NOT JSR310Module
             StellarDiskManager.DiskManagerState state = StellarDiskManager.getState();
             //The directory we're watching
             watching = state.getSpaceBridgeDirectory();
             //Our completed files go here
             SB_COMPLETED = watching.resolve("Space-Bridge Completed");
-            PLAYLIST_FOLDER = SB_COMPLETED.resolve("Temporal Playlists");
+            LIBRARY_LEDGER_PATH = SB_COMPLETED.resolve("Library Ledger.dat");
             SB_EXCEPTION_LOGGER = StellarLoggingFormatter.forTitle("Space-Bridge", EXCEPTION_LOG_PATH);
             logger.log(Level.INFO, "Space-Bridge Initial Setup Complete!");
             Runtime.getRuntime().addShutdownHook(new Thread(() -> {
@@ -146,33 +136,30 @@ public enum SpaceBridge {
      */
     public void initBridge() throws IOException {
         logger.log(Level.INFO, "\n\nSpace-Bridge Initiation");
+        //Get Previous Ledger if Available, make a new one if not
+        Files.createDirectories(LIBRARY_LEDGER_PATH.getParent());
+        if (!Files.exists(LIBRARY_LEDGER_PATH)) {
+            Files.createFile(LIBRARY_LEDGER_PATH);
+        } else {
+            //Previous Ledger Exists, Add It
+            Map<Path, ConverterMetadata> previousLedger = MAPPER.readValue(LIBRARY_LEDGER_PATH.toFile(),
+                    new TypeReference<HashMap<Path, ConverterMetadata>>() {
+            });
+            System.exit(0);
+            LIBRARY_LEDGER.putAll(previousLedger);
+            logger.info("Found a Previous Ledger, Adding It!");
+        }
         //Begin file walk
         Files.walk(watching, FileVisitOption.FOLLOW_LINKS).parallel()
-                //Not a directory, not IN the SB directory, & filename isn't already in the completed folder
-                .filter(path -> !Files.isDirectory(path) && !path.startsWith(SB_COMPLETED)
-                && Files.notExists(getCopyPath(path)))
-                //Main loop, copy everything over in a parallel fasion
+                //Don't get directories for the ledger & don't get playlist .xspf files
+                .filter(path -> !Files.isDirectory(path) && !path.getFileName().toString().contains(".xspf"))
+                //Main loop, build ledger
                 .forEach(filePath -> {
-                    Future<Path> future = StellarHyperspace.getHyperspace().submit(() -> {
-                        try {
-                            //Define destination of copy operation
-                            Path destination = getCopyPath(filePath);
-                            //Create Directories for this file if they don't exist already
-                            if (Files.notExists(destination.getParent())) {
-                                Files.createDirectories(destination.getParent());
-                            }
-                            //Doesn't Exist in Destination, Copy Over
-                            Files.copy(filePath, getCopyPath(filePath), StandardCopyOption.COPY_ATTRIBUTES,
-                                    StandardCopyOption.REPLACE_EXISTING);
-                            logger.log(Level.INFO, "<Space-Bridge>: \nCopied: " + filePath + "\n To: " + destination);
-                            LEDGER.add(new SBDatapacket(destination));
-                            return destination;
-                        } catch (IOException ex) {
-                            Logger.getLogger(SpaceBridge.class.getName()).log(Level.SEVERE, null, ex);
-                            throw new RuntimeException("We were unable to copy: " + filePath + "\n during the space-bridge operation."
-                                    + " The disk might be full or some other I/O related error.", ex);
-                        }
-                    });
+                    //If the file exists in our ledger, don't force a costly exiftool
+                    //Add only if we don't have it in our list
+                    if (!LIBRARY_LEDGER.containsKey(filePath)) {
+                        LIBRARY_LEDGER.put(filePath, StellarDiskManager.getMetadata(filePath));
+                    }
                 });
         //All work completed
         logger.info("Shutting Down Stellar Hyperspace");
@@ -205,138 +192,40 @@ public enum SpaceBridge {
      * where the freshly converted .opus files are
      */
     private static void generateTemporalPlaylists() throws IOException {
-        //Ledger is Already Set Up for New Data, get new data that is for our root playlist and add it to ledger file
-        List<SBDatapacket> ledger;
         for (PLAYLIST playlist : PLAYLIST.values()) {
-            //Define Current Playlist Folder
-            Path currentPlaylistFolder = PLAYLIST_FOLDER.resolve(playlist.toString());
+            logger.info("About to delte old entries from playlist: " + playlist);
             //Folders Are Already Set Up, But we Need to Make the Current Playlists Folder
-            Files.createDirectories(currentPlaylistFolder);
-            Path ledgerPath = currentPlaylistFolder.resolve(LEDGER_FILENAME);
-            //If Ledger Exists, Get Old Data & Combine With New Data -> Back to Disk
-            if (Files.exists(ledgerPath)) {
-                logger.info("Ledger Found for " + ledgerPath + "!");
-                //Get list from local file
-                ledger = MAPPER.readValue(ledgerPath.toFile(), new TypeReference<List<SBDatapacket>>() {
-                });
-            } else {
-                logger.info("No ledger found for " + ledgerPath + "\nCreating a New One");
-                //If the folder is empty, all entries are in LEDGER, no need to exiftool entire directory
-                if (Files.list(currentPlaylistFolder).count() == 0) {
-                    ledger = Collections.emptyList();
-                } else {
-                    //There Were Previous Entries, Generate New Ledger
-                    ledger = Files.walk(SB_COMPLETED, FileVisitOption.FOLLOW_LINKS).parallel()
-                            .filter(path -> !path.startsWith(PLAYLIST_FOLDER) && !Files.isDirectory(path)).map(SBDatapacket::new)
-                            .collect(Collectors.toList());
-                }
-                //Make Ledger
-                Files.createFile(ledgerPath);
-            }
-            List<SBDatapacket> combined = Stream.concat(LEDGER.stream(), ledger.stream())
-                    //There might be files not converted by Stellar, these files won't have our stellar specific date field,
-                    //so we can't sort them by time of indexing, and they must be excluded.
-                    .filter(datapacket -> !datapacket.getMetadata().getStellarIndexDate()
-                    .equals(ConverterMetadata.getDefaultMetadata().getStellarIndexDate())).collect(Collectors.toList());
-            //Copy Current Entries to Current Playlist
-            combined.parallelStream().filter(data -> !Files.isDirectory(data.getPath())
-                    && playlist.isInCurrentDateRange(data)).map(SBDatapacket::getPath)
+            Files.createDirectories(playlist.getPath());
+            //Purge Old Entries
+            Files.walk(playlist.getPath()).parallel()
+                    //Filter by: Is NOT in date range for deletion?
+                    .filter(path -> !playlist.isInCurrentDateRange(StellarDiskManager.getMetadata(path)))
+                    //Delete all not in range
                     .forEach(path -> {
                         try {
-                            //Checking for existance is far less intensive than copying a large 320K file
-                            path.toString();
-                            Path destinationPath = currentPlaylistFolder.resolve(path.getFileName());
-                            if (Files.notExists(destinationPath)) {
-                                Files.copy(path, destinationPath, StandardCopyOption.COPY_ATTRIBUTES, StandardCopyOption.REPLACE_EXISTING);
-                            }
+                            Files.deleteIfExists(path);
+                            logger.info("Deleted: " + path);
                         } catch (IOException ex) {
-                            Logger.getLogger(SpaceBridge.class.getName()).log(Level.SEVERE, null, ex);
-                            SB_EXCEPTION_LOGGER.severe("I/O Exception While trying to copy file to current playlist folder " + ex);
+                            logger.severe(ex.toString());
                         }
                     });
-            //Delete Old Entries From Current Playlist
-            combined.parallelStream().filter(data -> !playlist.isInCurrentDateRange(data)).map(SBDatapacket::getPath)
-                    .map(path -> currentPlaylistFolder.resolve(path.getFileName()))
-                    .map(Path::toFile).forEach(file -> FileUtils.deleteQuietly(file));
-            combined = combined.parallelStream().filter(data -> playlist.isInCurrentDateRange(data))
-                    .collect(Collectors.toList());
-            MAPPER.writeValue(ledgerPath.toFile(), combined);
+            ;
+            //Copy all files that fall within the time period for this playlist
+            LIBRARY_LEDGER.keySet().stream().parallel()
+                    //Filter by if it's in the right date range for this playlist& doesn't exist
+                    .filter(path -> playlist.isInCurrentDateRange(LIBRARY_LEDGER.get(path))
+                    && Files.notExists(playlist.getPath().resolve(path.getFileName())))
+                    //Add the files to the appropriate playlist folder
+                    .forEach(path -> {
+                        try {
+                            Files.copy(path, playlist.getPath().resolve(path.getFileName()), StandardCopyOption.COPY_ATTRIBUTES);
+                        } catch (IOException ex) {
+                            logger.severe(ex.toString());
+                        }
+                    });
+            logger.info("Temporal Playlist Generation Finished for: " + playlist);
         }
-    }
-
-    /**
-     * A wrapper class for optimising performance of the generate playlists
-     * subroutine.
-     */
-    private static class SBDatapacket {
-
-        @JsonProperty(value = "path")
-        private final Path path;
-        @JsonProperty(value = "metadata")
-        private final ConverterMetadata metadata;
-
-        /**
-         * Creates a {@link SBDatapacket} with the specified path.
-         *
-         * @param path The path of the file to record
-         */
-        public SBDatapacket(Path path) {
-            this.path = path;
-            this.metadata = StellarDiskManager.getMetadata(path);
-        }
-
-        /**
-         * Constructor for the wrapper
-         *
-         * @param path The path of the file
-         * @param date The date the file was created
-         */
-        @JsonCreator
-        SBDatapacket(@JsonProperty(value = "path") Path path,
-                @JsonProperty(value = "metadata") ConverterMetadata metadata) {
-            this.path = path;
-            this.metadata = metadata;
-        }
-
-        @Override
-        public int hashCode() {
-            int hash = 7;
-            hash = 11 * hash + Objects.hashCode(this.metadata);
-            return hash;
-        }
-
-        @Override
-        public boolean equals(Object obj) {
-            if (this == obj) {
-                return true;
-            }
-            if (obj == null) {
-                return false;
-            }
-            if (getClass() != obj.getClass()) {
-                return false;
-            }
-            final SBDatapacket other = (SBDatapacket) obj;
-            return Objects.equals(this.metadata, other.metadata);
-        }
-
-        /**
-         * A getter for the path
-         *
-         * @return The path
-         */
-        public Path getPath() {
-            return this.path;
-        }
-
-        /**
-         * A getter for the metadata.
-         *
-         * @return The metadata
-         */
-        public ConverterMetadata getMetadata() {
-            return this.metadata;
-        }
+        MAPPER.writeValue(LIBRARY_LEDGER_PATH.toFile(), LIBRARY_LEDGER);
     }
 
     /**
@@ -421,8 +310,8 @@ public enum SpaceBridge {
          * @param root The parent this playlist is expected to be in
          * @return The path to the folder of this playlist
          */
-        public Path getPath(Path root) {
-            return root.resolve(toString());
+        public Path getPath() {
+            return SB_COMPLETED.resolve(toString());
         }
 
         /**
@@ -432,8 +321,8 @@ public enum SpaceBridge {
          * @param wrapper The wrapper containing the date
          * @return Whether or not this is true
          */
-        public boolean isInCurrentDateRange(SBDatapacket wrapper) {
-            return isInCurrentDateRange(wrapper.getMetadata().getStellarIndexDate());
+        public boolean isInCurrentDateRange(ConverterMetadata metadata) {
+            return isInCurrentDateRange(metadata.getStellarIndexDate());
         }
 
         /**

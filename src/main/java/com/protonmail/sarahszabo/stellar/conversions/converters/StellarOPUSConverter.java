@@ -310,7 +310,7 @@ public class StellarOPUSConverter {
      * @throws IOException If something went wrong
      */
     public Optional<Path> convertToOPUS() throws IOException {
-        return convertToOPUS(320);
+        return convertToOPUS(190);
     }
 
     /**

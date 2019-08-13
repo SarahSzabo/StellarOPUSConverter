@@ -3,14 +3,13 @@ BUG FIXES:
 -Display List for Converted Files That aren't .mp4 does not Display Properly
 
 HIGH PRIORITY:
--If file is in Artist - Filename format, ignore exiftool (Generates Artwork Properly?)
 -YoutubeDL Support (Timestamps)
 -Deprication & Removal of Obsolete Code
 -YoutubeUplink -> Send Downloaded Video to Temp Folder, Not Output Folder
 -Make All/FFMPEG Commands not have to copy the file to convert over to the temp folder
--Make a FLAC Converter (Ensure Can Get Picture)
 -Make "StellarConverter" Interface or Superclass
 -If a file doesn't have Stellar Conversion Date Stamp, Don't Include In Playlists
+-If we're using tags from an already existing file, ensure that they are capitalized properly
 
 MODERATE PRIORITY:
 -Make Space-Bridge Only Generate Temporal Playlists Instead of Copying Over Everything
