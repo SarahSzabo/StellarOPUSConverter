@@ -283,6 +283,9 @@ public enum StellarMode {
                 Logger.getLogger(StellarMode.class.getName()).log(Level.SEVERE, null, ex);
             }
             Platform.exit();
+        } else {
+            throw new IllegalStateException("A File in the Path Doesn't Exist! "
+                    + "You might be using an illegal characterset for the filename!");
         }
     }
 

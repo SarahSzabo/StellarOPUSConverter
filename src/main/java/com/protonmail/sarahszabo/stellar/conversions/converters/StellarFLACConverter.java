@@ -1,7 +1,18 @@
 /*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
+ * Copyright (C) 2020 Sarah Szabo <SarahSzabo@Protonmail.com>
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 package com.protonmail.sarahszabo.stellar.conversions.converters;
 
@@ -28,7 +39,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.Stack;
 import java.util.logging.ConsoleHandler;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -40,7 +50,7 @@ import java.util.stream.Collectors;
  *
  * @author Sarah Szabo <PhysicistSarah@Gmail.com>
  */
-public class StellarOPUSConverter {
+public class StellarFLACConverter {
 
     /**
      * The created by tag, used for metadata comments.
@@ -129,7 +139,7 @@ public class StellarOPUSConverter {
      * @param filePath The path of the file for which metadata analysis is
      * taking place
      * @return The metadata found or
-     * {@link StellarOPUSConverter#getDefaultMetadata()} if none was found
+     * {@link StellarFLACConverter#getDefaultMetadata()} if none was found
      */
     public static ConverterMetadata generateMetadata(Path filePath) {
         return generateMetadataFromRegex(filePath, "-", "|", "/");
@@ -140,11 +150,11 @@ public class StellarOPUSConverter {
     private final ConverterMetadataBuilder metadata;
     private final FileExtension fileExtension;
     private final Logger logger;
-    private Path opusFilePath;
-    private String opusFileName;
+    private Path flacFilePath;
+    private String flacFileName;
 
     /**
-     * Constructs a new {@link StellarOPUSConverter} with the specified file
+     * Constructs a new {@link StellarFLACConverter} with the specified file
      * path and manually specified output folder. If the converted file already
      * exists, it is overwritten. For supported file extensions, see
      * {@link FileExtension}.
@@ -157,7 +167,7 @@ public class StellarOPUSConverter {
      * @throws IllegalArgumentException If file type not supported by this
      * converter
      */
-    public StellarOPUSConverter(Path filePath, Path outputFolder, Logger logger, ConverterMetadata metadata) throws IOException {
+    public StellarFLACConverter(Path filePath, Path outputFolder, Logger logger, ConverterMetadata metadata) throws IOException {
         if (Files.isDirectory(filePath)) {
             throw new IllegalArgumentException("The given file path is that of a direcory!");
         } else if (!Files.isDirectory(outputFolder)) {
@@ -178,14 +188,14 @@ public class StellarOPUSConverter {
             throw new IllegalArgumentException("The file extention type is not supported by the converter!" + filePath.toString(), ex);
         }
         this.originalFileNameNoEXTPreferred = preferredTitleFormat(this.originalFileNameNoEXT);
-        this.opusFileName = preferredTitleFormat(this.originalFileNameNoEXTPreferred + ".opus");
-        this.opusFilePath = this.outputFolder.resolve(this.opusFileName);
+        this.flacFileName = preferredTitleFormat(this.originalFileNameNoEXTPreferred + ".flac");
+        this.flacFilePath = this.outputFolder.resolve(this.flacFileName);
         //Define Metadata Before Metadata Generation
         this.metadata = new ConverterMetadataBuilder(Objects.requireNonNull(metadata));
     }
 
     /**
-     * Constructs a new {@link StellarOPUSConverter} with the specified file
+     * Constructs a new {@link StellarFLACConverter} with the specified file
      * path and manually specified output folder.If the converted file already
      * exists, it is overwritten.
      *
@@ -194,12 +204,12 @@ public class StellarOPUSConverter {
      * @param logger The cartographer to use with this converter
      * @throws java.io.IOException If something happened
      */
-    public StellarOPUSConverter(Path filePath, Path outputFolder, Logger logger) throws IOException {
+    public StellarFLACConverter(Path filePath, Path outputFolder, Logger logger) throws IOException {
         this(filePath, outputFolder, logger, StellarDiskManager.getMetadata(filePath));
     }
 
     /**
-     * Constructs a new {@link StellarOPUSConverter} with the specified file
+     * Constructs a new {@link StellarFLACConverter} with the specified file
      * path and manually specified output folder. If the converted file already
      * exists, it is overwritten. Uses the metadata specified.
      *
@@ -208,12 +218,12 @@ public class StellarOPUSConverter {
      * @param metadata The metadata to use with this converter
      * @throws java.io.IOException If something happened
      */
-    public StellarOPUSConverter(Path filePath, Path outputFolder, ConverterMetadata metadata) throws IOException {
-        this(filePath, outputFolder, StellarLoggingFormatter.forClass(StellarOPUSConverter.class), metadata);
+    public StellarFLACConverter(Path filePath, Path outputFolder, ConverterMetadata metadata) throws IOException {
+        this(filePath, outputFolder, StellarLoggingFormatter.forClass(StellarFLACConverter.class), metadata);
     }
 
     /**
-     * Constructs a new {@link StellarOPUSConverter} with the specified file
+     * Constructs a new {@link StellarFLACConverter} with the specified file
      * path and manually specified output folder. If the converted file already
      * exists, it is overwritten.
      *
@@ -221,30 +231,30 @@ public class StellarOPUSConverter {
      * @param outputFolder The path to put the finished file in
      * @throws java.io.IOException If something happened
      */
-    public StellarOPUSConverter(Path filePath, Path outputFolder) throws IOException {
-        this(filePath, outputFolder, StellarLoggingFormatter.forClass(StellarOPUSConverter.class));
+    public StellarFLACConverter(Path filePath, Path outputFolder) throws IOException {
+        this(filePath, outputFolder, StellarLoggingFormatter.forClass(StellarFLACConverter.class));
     }
 
     /**
-     * Constructs a new {@link StellarOPUSConverter} with the specified file
+     * Constructs a new {@link StellarFLACConverter} with the specified file
      * path and metadata.
      *
      * @param filePath The file for conversion
      * @param metadata The metadata to use with this converter
      * @throws java.io.IOException If something happened
      */
-    public StellarOPUSConverter(Path filePath, ConverterMetadata metadata) throws IOException {
-        this(filePath, StellarDiskManager.getOutputFolder(), StellarLoggingFormatter.forClass(StellarOPUSConverter.class), metadata);
+    public StellarFLACConverter(Path filePath, ConverterMetadata metadata) throws IOException {
+        this(filePath, StellarDiskManager.getOutputFolder(), StellarLoggingFormatter.forClass(StellarFLACConverter.class), metadata);
     }
 
     /**
-     * Constructs a new {@link StellarOPUSConverter} with the specified file
+     * Constructs a new {@link StellarFLACConverter} with the specified file
      * path.
      *
      * @param filePath The file for conversion
      * @throws java.io.IOException If something happened
      */
-    public StellarOPUSConverter(Path filePath) throws IOException {
+    public StellarFLACConverter(Path filePath) throws IOException {
         this(filePath, StellarDiskManager.getOutputFolder());
     }
 
@@ -288,16 +298,7 @@ public class StellarOPUSConverter {
             generateTitleArtist();
         }
         //If we have either tags, or one of the above, we're good, do conversion operation
-        final Stack<Path> stack = new Stack<>();
-        copyOP(() -> {
-            try {
-                stack.push(toOpusFile(bitrate));
-            } catch (IOException ex) {
-                Logger.getLogger(StellarOPUSConverter.class.getName()).log(Level.SEVERE, null, ex);
-                throw new IllegalStateException("Conversion " + this.originalFilePath + " was unsuccessful.", ex);
-            }
-        });
-        return Optional.of(stack.pop());
+        return Optional.of(toFlacFile());
     }
 
     /**
@@ -310,7 +311,7 @@ public class StellarOPUSConverter {
      * @throws IOException If something went wrong
      */
     public Optional<Path> convertToOPUS() throws IOException {
-        return convertToOPUS(192);
+        return convertToOPUS(190);
     }
 
     /**
@@ -329,7 +330,7 @@ public class StellarOPUSConverter {
         //ffmpeg -i "video.m2ts" -vn -sn -acodec flac -compression_level 12 "audio.flac"
         processOP(true, "ffmpeg", "-i", this.originalFilePath.getFileName().toString(), "-ss", start.toString(),
                 "-to", end.toString(), "-y", "-vn", "-sn", "-acodec", "flac",
-                "-compression_level", "0", title);
+                "-compression_level", "6", title);
         return newPath(StellarDiskManager.getTempDirectory(), title);
     }
 
@@ -346,7 +347,7 @@ public class StellarOPUSConverter {
         //Fast FLAC Audio ripped from video
         //ffmpeg -i "video.m2ts" -vn -sn -acodec flac -compression_level 12 "audio.flac"
         processOP(true, "ffmpeg", "-i", this.originalFilePath.getFileName().toString(), "-y", "-vn", "-sn", "-acodec", "flac",
-                "-compression_level", "0", title);
+                "-compression_level", "6", title);
         return newPath(StellarDiskManager.getTempDirectory(), title);
     }
 
@@ -382,7 +383,7 @@ public class StellarOPUSConverter {
         processImage();
         Path flacFile = start == null || end == null ? toFlacFile() : toFlacFile(start, end);
         //Delete Intermediate .opus File Before Running New .opus Conversion
-        Files.deleteIfExists(newPath(StellarDiskManager.getTempDirectory(), this.opusFileName));
+        Files.deleteIfExists(newPath(StellarDiskManager.getTempDirectory(), this.flacFileName));
         String title = FileExtension.stripFileExtension(flacFile) + ".opus";
         //Check the Date Field
         if (isDefaultMetadata(MetadataType.DATE)) {
@@ -404,7 +405,7 @@ public class StellarOPUSConverter {
         //Did we have previous artist/title tags? Don't duplicate them! Not Needed for .opus
         if (previousTags && this.fileExtension != FileExtension.OPUS) {
             processOP(true, "opusenc", flacFile.getFileName().toString(), title,
-                    "--bitrate", bitrate + "K",
+                    "--bitrate", bitrate + "k",
                     "--picture", metadata.getAlbumArtPath().toAbsolutePath().toString(),
                     "--comment", MetadataType.DATE.toString() + "=" + metadata.getStellarIndexDate().format(DATE_FORMATTER),
                     "--comment", metadata.getCreatedBy()
@@ -412,7 +413,7 @@ public class StellarOPUSConverter {
         } //No previous tags to worry about, continue as usual
         else {
             processOP(true, "opusenc", flacFile.getFileName().toString(), title,
-                    //"--bitrate", bitrate + "k",
+                    "--bitrate", bitrate + "k",
                     "--title", metadata.getTitle(),
                     "--artist", metadata.getArtist(),
                     "--picture", metadata.getAlbumArtPath().toAbsolutePath().toString(),
@@ -423,7 +424,7 @@ public class StellarOPUSConverter {
 
         //If we have metadata title, return that as the filename
         String fileTitle = this.metadata.getTitle().equalsIgnoreCase(ConverterMetadata.getDefaultMetadata().getTitle())
-                ? this.opusFileName : this.metadata.getTitle() + ".opus";
+                ? this.flacFileName : this.metadata.getTitle() + ".opus";
         //Copy Back from temp folder
         Files.copy(newPath(StellarDiskManager.getTempDirectory(), this.metadata.getTitle() + ".opus"),
                 newPath(this.outputFolder, fileTitle), StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.COPY_ATTRIBUTES);
@@ -461,15 +462,14 @@ public class StellarOPUSConverter {
         this.metadata.addAll(StellarCLIUtils.askUserForArtistTitle("Filename: " + this.originalFilePath.getFileName()
                 + "\nStart: " + start + "\nEnd: " + end, ""));
         //Cut out the audio and convert it to .opus
-        copyOP(() -> {
-            try {
-                processImage();
-                toOpusFile(bitrate, start, end);
-            } catch (IOException ex) {
-                Logger.getLogger(StellarOPUSConverter.class.getName()).log(Level.SEVERE, null, ex);
-            }
-        });
-        return Optional.of(StellarDiskManager.getOutputFolder().resolve(this.metadata.getTitle() + ".opus"));
+        try {
+            //TODO: Fix this and implement
+            processImage();
+            toOpusFile(bitrate, start, end);
+        } catch (IOException ex) {
+            Logger.getLogger(StellarFLACConverter.class.getName()).log(Level.SEVERE, null, ex);
+        }
+        return Optional.of(StellarDiskManager.getOutputFolder().resolve(this.metadata.getTitle() + ".flac"));
     }
 
     /**
@@ -482,8 +482,8 @@ public class StellarOPUSConverter {
         ConverterMetadata metadata = generateMetadataFromRegex(this.originalFilePath, "-", "|", "/");
         this.metadata.artist(metadata.getArtist());
         this.metadata.title(metadata.getTitle());
-        this.opusFileName = preferredTitleFormat(this.metadata.getTitle() + ".opus");
-        this.opusFilePath = this.outputFolder.resolve(this.opusFileName);
+        this.flacFileName = preferredTitleFormat(this.metadata.getTitle() + ".opus");
+        this.flacFilePath = this.outputFolder.resolve(this.flacFileName);
         //Only Return True if Both Are Not Default
         return !ConverterMetadata.getDefaultMetadata().equals(this.metadata.buildMetadata());
     }
@@ -570,7 +570,7 @@ public class StellarOPUSConverter {
 
     /**
      * Gets the metadata. Note that the metadata is only set after
-     * {@link StellarOPUSConverter#convertToOPUS()} has been called.
+     * {@link StellarFLACConverter#convertToOPUS()} has been called.
      *
      * @return The metadata in read-only format
      */
@@ -594,8 +594,8 @@ public class StellarOPUSConverter {
      *
      * @return The file path
      */
-    public Path getOpusFilePath() {
-        return this.opusFilePath;
+    public Path getFlacFilePath() {
+        return this.flacFilePath;
     }
 
     /**
@@ -603,8 +603,8 @@ public class StellarOPUSConverter {
      *
      * @return The name of the .opus file
      */
-    public String getOpusFileName() {
-        return this.opusFileName;
+    public String getFlacFileName() {
+        return this.flacFileName;
     }
 
     /**

@@ -7,20 +7,25 @@ package com.protonmail.sarahszabo.stellar;
 
 import com.protonmail.sarahszabo.stellar.conversions.StellarFFMPEGTimeStamp;
 import com.protonmail.sarahszabo.stellar.conversions.converters.StellarOPUSConverter;
+import com.protonmail.sarahszabo.stellar.conversions.converters.StellarStandardFormConverter;
 import com.protonmail.sarahszabo.stellar.metadata.ConverterMetadataBuilder;
 import com.protonmail.sarahszabo.stellar.util.StellarCLIUtils;
 import com.protonmail.sarahszabo.stellar.util.StellarGravitonField;
 import static com.protonmail.sarahszabo.stellar.util.StellarGravitonField.*;
 import com.protonmail.sarahszabo.stellar.util.StellarGreatFilter;
 import java.io.IOException;
+import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.stream.Collectors;
 
 /**
  * The main class.
@@ -41,6 +46,11 @@ public class Main {
      * The full name and version number of the program.
      */
     public static final String FULL_PROGRAM_NAME = PROGRAM_NAME + " " + VERSION;
+
+    /**
+     * The logger for this class
+     */
+    public static final Logger logger = Logger.getLogger(Main.class.getName());
 
     /**
      * @param args the command line arguments
@@ -66,6 +76,8 @@ public class Main {
             } //Get From Clipboard
             else if (args[0].equalsIgnoreCase("-CL")) {
                 StellarMode.GET_FROM_CLIPBOARD.start(args);
+            } else if (args[0].equalsIgnoreCase("-TO_STANDARD_FORM")) {
+                handleToStandardForm();
             } //Initiate Region Scan, Applying all filters from grand filter
             else if (args[0].equalsIgnoreCase("Region-Scan")) {
                 StellarGreatFilter.filterPaths(StellarCLIUtils.getFilesFromClipboard().get());
@@ -146,6 +158,56 @@ public class Main {
         }
         StellarCLIUtils.shutdownUI();
         System.exit(0);
+    }
+
+    /**
+     * Scans the current directory for malformatted filenames: multiple "-"
+     * characters. Exits if it finds one.
+     */
+    private static void scanForMalformattedFilenames(Path currentDir) throws IOException {
+        System.out.println("\nBeginning Scan for Malformatted Filenames");
+        var files = Files.list(currentDir);
+        var malformedList = new ArrayList<Path>(100);
+        files.parallel().map(path -> new StellarStandardFormConverter(path, path.getParent()))
+                .filter(converter -> !converter.isConversionCandidate())
+                .forEach(converter -> malformedList.add(converter.getInputFile()));
+        if (!malformedList.isEmpty()) {
+            StellarGravitonField.messageThenExit("The following files are malformed (multiple \"-\" characters):\n\n"
+                    + malformedList.stream().map(Path::toString).collect(Collectors.joining("\n"))
+                    + "\n\nIndexing Aborted");
+        } else {
+            System.out.println("Scan completed. No malformed filenames detected\n");
+        }
+    }
+
+    /**
+     * Handles the file rename request by setting the filename to standard form
+     * for the entire directory.
+     */
+    private static void handleToStandardForm() throws IOException {
+        //TODO: If the title tag has ARTIST - TITLE in it, auto-correct to just TITLE, same for the artist tag field
+        var currentDir = System.getProperty("user.dir");
+        System.out.println("Current Directory: " + currentDir);
+        //Scan for malformatted filenames <multiple "-">
+        scanForMalformattedFilenames(Paths.get(currentDir));
+
+        //UI for confirmation
+        var response = StellarCLIUtils.showConfirmationDialog("Current Directory: " + currentDir
+                + "\n\nAre all the files in this folder in ARTIST - FILENAME.EXTENSION format and are ready to be changed?");
+        if (response) {
+            //List for duplicate files to watch out for at the end
+            var duplicateList = new ArrayList<Path>(10);
+            Files.list(Paths.get(currentDir)).parallel().map(path -> new StellarStandardFormConverter(path, path.getParent()))
+                    .forEach(converter -> {
+                        converter.convert();
+                        if (converter.hadDuplicate()) {
+                            duplicateList.add(converter.getDestinationFile());
+                        }
+                    });
+
+            //Report duplicate files
+            hyperlightMessage("Duplicate Files Observed: \n" + duplicateList.stream().map(Path::toString).collect(Collectors.joining("\n")));
+        }
     }
 
     /**

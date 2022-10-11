@@ -5,8 +5,6 @@
  */
 package com.protonmail.sarahszabo.stellar;
 
-import com.protonmail.sarahszabo.stellar.util.StellarCLIUtils;
-import com.protonmail.sarahszabo.stellar.conversions.converters.StellarOPUSConverter;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
@@ -15,14 +13,17 @@ import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.databind.exc.InvalidDefinitionException;
 import com.fasterxml.jackson.databind.exc.UnrecognizedPropertyException;
 import com.fasterxml.jackson.databind.module.SimpleModule;
+import com.protonmail.sarahszabo.stellar.conversions.converters.StellarOPUSConverter;
 import com.protonmail.sarahszabo.stellar.metadata.ConverterMetadata;
 import com.protonmail.sarahszabo.stellar.metadata.ConverterMetadataBuilder;
 import com.protonmail.sarahszabo.stellar.metadata.MetadataType;
 import com.protonmail.sarahszabo.stellar.util.PathDeserializer;
+import com.protonmail.sarahszabo.stellar.util.StellarCLIUtils;
 import com.protonmail.sarahszabo.stellar.util.StellarGravitonField;
 import static com.protonmail.sarahszabo.stellar.util.StellarGravitonField.*;
 import com.protonmail.sarahszabo.stellar.util.StellarLoggingFormatter;
 import java.io.IOException;
+import java.nio.charset.Charset;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -50,9 +51,9 @@ public enum StellarDiskManager {
      */
     DISKMANAGER;
     /**
-     * The user directory.
+     * The user directory (root).
      */
-    public static final Path USER_DIR = Paths.get(System.getProperty("user.dir"));
+    public static final Path USER_DIR = Paths.get("/home/sarah");
     /**
      * The configuration folder
      */
@@ -70,7 +71,7 @@ public enum StellarDiskManager {
     /**
      * The path to the default pictures folder.
      */
-    public static final Path DEFAULT_PICTURES = newPath(CONFIGURATION_FOLDER, "Default Pictures");
+    public static final Path DEFAULT_PICTURES = CONFIGURATION_FOLDER.resolve("Default Pictures");
     /**
      * The folder for system pictures.
      */
@@ -150,7 +151,13 @@ public enum StellarDiskManager {
             //Create Metadata file
             processOP(true, metadataFilePath, REINDEXING_FOLDER, "exiftool", path.getFileName().toString());
             //Trim Entries from exiftool
-            List<String> lines = Files.readAllLines(metadataFilePath).stream().collect(Collectors.toList());
+            List<String> lines = null;
+            //PATCH: Sometimes exiftool writes in UTF- and others in ASCII (Cp1252)
+            try {
+                lines = Files.readAllLines(metadataFilePath).stream().collect(Collectors.toList());
+            } catch (Exception e) {
+                lines = Files.readAllLines(metadataFilePath, Charset.forName("Cp1252")).stream().collect(Collectors.toList());
+            }
             ConverterMetadataBuilder metadata
                     = new ConverterMetadataBuilder(ConverterMetadata.getDefaultMetadata());
             for (String str : lines) {

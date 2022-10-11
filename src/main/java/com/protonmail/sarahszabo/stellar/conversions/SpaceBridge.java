@@ -9,8 +9,11 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.databind.module.SimpleModule;
 import com.protonmail.sarahszabo.stellar.StellarDiskManager;
 import com.protonmail.sarahszabo.stellar.metadata.ConverterMetadata;
+import com.protonmail.sarahszabo.stellar.util.PathDeserializer;
 import com.protonmail.sarahszabo.stellar.util.StellarGravitonField;
 import com.protonmail.sarahszabo.stellar.util.StellarLoggingFormatter;
 import java.io.IOException;
@@ -57,7 +60,7 @@ public enum SpaceBridge {
     /**
      * The ledger used for mapping the entire library for the temporal playlists
      */
-    private static final Map<Path, ConverterMetadata> LIBRARY_LEDGER = new HashMap<>(1500);
+    private static final Map<Path, ConverterMetadata> LIBRARY_LEDGER = new HashMap<>(3000);
     /**
      * The filename and extension of the playlist ledger.
      */
@@ -91,6 +94,11 @@ public enum SpaceBridge {
      */
     static {
         try {
+            MAPPER.findAndRegisterModules();
+            var module = new SimpleModule("Path Deserializer Module");
+            module.addKeyDeserializer(Path.class, new PathDeserializer());
+            MAPPER.registerModule(module);
+            MAPPER.enable(SerializationFeature.INDENT_OUTPUT);
             StellarDiskManager.DiskManagerState state = StellarDiskManager.getState();
             //The directory we're watching
             watching = state.getSpaceBridgeDirectory();
@@ -193,7 +201,7 @@ public enum SpaceBridge {
      */
     private static void generateTemporalPlaylists() throws IOException {
         for (PLAYLIST playlist : PLAYLIST.values()) {
-            logger.info("About to delte old entries from playlist: " + playlist);
+            logger.info("About to delete old entries from playlist: " + playlist);
             //Folders Are Already Set Up, But we Need to Make the Current Playlists Folder
             Files.createDirectories(playlist.getPath());
             //Purge Old Entries
@@ -238,6 +246,9 @@ public enum SpaceBridge {
         ONE_WEEK {
             @Override
             public boolean isInCurrentDateRange(LocalDate date) {
+                if (date == null) {
+                    return false;
+                }
                 boolean f = date.isAfter(LocalDate.now().minusWeeks(1));
                 return date.isAfter(LocalDate.now().minusWeeks(1));
             }

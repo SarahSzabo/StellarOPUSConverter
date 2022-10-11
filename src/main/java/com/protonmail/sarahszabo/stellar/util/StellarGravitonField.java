@@ -29,6 +29,8 @@ import java.util.stream.Stream;
  */
 public class StellarGravitonField {
 
+    private static final String MESSAGE_FIELD_SEPERATOR = "---------------------------------------------------------------------------------------";
+
     /**
      * The primary date-time formatter.
      */
@@ -40,6 +42,26 @@ public class StellarGravitonField {
             .appendLiteral(".").appendValue(ChronoField.MILLI_OF_SECOND).toFormatter();
 
     private static final Logger logger = Logger.getLogger(StellarGravitonField.class.getName());
+
+    /**
+     * Prints out a large message with horizontal bars for seperators.
+     *
+     * @param message The message to print
+     */
+    public static final void hyperlightMessage(Object message) {
+        System.out.println("\n\n" + MESSAGE_FIELD_SEPERATOR + "\n" + message
+                + "\n" + MESSAGE_FIELD_SEPERATOR + "\n");
+    }
+
+    /**
+     * Prints out a large message with horizontal bars for seperators.
+     *
+     * @param message The message to print
+     */
+    public static final void hyperlightMessage(String message) {
+        System.out.println("\n\n" + MESSAGE_FIELD_SEPERATOR + "\n" + message
+                + "\n" + MESSAGE_FIELD_SEPERATOR + "\n");
+    }
 
     /**
      * Strips the file extension off newPath the fileName and returns it.
@@ -90,6 +112,18 @@ public class StellarGravitonField {
      */
     public static boolean processOP(String... commands) throws IOException {
         return processOP(false, commands);
+    }
+
+    /**
+     * Launches a new process in the temp directory, and waits for its
+     * completion. Does not inherit IO.
+     *
+     * @param commands The commands to execute
+     * @throws IOException InterruptedException If something went wrong
+     * @return Whether or not the operation timed out or not
+     */
+    public static boolean processOPCurrentDIR(boolean inheritIO, String... commands) throws IOException {
+        return processOP(true, null, Paths.get(System.getProperty("user.dir")), commands);
     }
 
     /**

@@ -13,6 +13,8 @@ Special File Options (Note: Use These Just By Themselves, Ex: -CL):
 -CL "Artist" = All Files in Clipboard Share this Artist, No Prompts Required
 -CL Picture-Select = Copy All Files, Including the video from which you want to rip the picture from, then rips the picture from the video you select and uses this picture for the album art.
 
+-TO_STANDARD_FORM = Assumes that the file is in ARTIST - TITLE form and converts it to TITLE.EXTENSION (truncates the first part before the "-"). This happens for all files in the directory.
+
 Alternate Modes:
 Space-Bridge = Enables the Space-Bridge Mobile Conversion Functionality. This watches a certain directory and all sub-directories
  and converts them to 320 & 190K for high quality .opus libraries & mobile devices.

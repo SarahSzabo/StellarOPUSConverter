@@ -82,6 +82,23 @@ public enum FileExtension {
         public String toString() {
             return ".mp3";
         }
+    },
+    /**
+     * MKV Files.
+     */
+    MKV {
+        @Override
+        public String toString() {
+            return ".mkv";
+        }
+    },/**
+     * WAV Files.
+     */
+    WAV {
+        @Override
+        public String toString() {
+            return ".wav";
+        }
     };
 
     /**
@@ -91,7 +108,7 @@ public enum FileExtension {
      * @return Whether or not the sent extension is a video or not.
      */
     public static boolean isVideo(FileExtension ext) {
-        return ext == MP4 || ext == FLV;
+        return ext == MP4 || ext == FLV || ext == MKV || ext == WEBM;
     }
 
     /**

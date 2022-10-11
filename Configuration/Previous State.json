@@ -1,1 +1,5 @@
-{"outputFolder":"file:///home/sarah/Music/Indexing/","pictureOutputFolder":"file:///home/sarah/Music/Indexing/","spaceBridgeDirectory":"file:///home/sarah/Music/Indexing/Playlists/"}
+{
+  "outputFolder" : "file:///home/sarah/Music/Indexing/",
+  "pictureOutputFolder" : "file:///home/sarah/Music/Indexing/",
+  "spaceBridgeDirectory" : "file:///home/sarah/Music/Indexing/Playlists/"
+}
