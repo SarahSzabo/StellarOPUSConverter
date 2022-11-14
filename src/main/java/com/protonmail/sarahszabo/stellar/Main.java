@@ -7,18 +7,16 @@ package com.protonmail.sarahszabo.stellar;
 
 import com.protonmail.sarahszabo.stellar.conversions.StellarFFMPEGTimeStamp;
 import com.protonmail.sarahszabo.stellar.conversions.converters.StellarOPUSConverter;
-import com.protonmail.sarahszabo.stellar.conversions.converters.StellarStandardFormConverter;
+import com.protonmail.sarahszabo.stellar.conversions.converters.standardformconverter.StellarStandardFormConverter;
 import com.protonmail.sarahszabo.stellar.metadata.ConverterMetadataBuilder;
 import com.protonmail.sarahszabo.stellar.util.StellarCLIUtils;
 import com.protonmail.sarahszabo.stellar.util.StellarGravitonField;
 import static com.protonmail.sarahszabo.stellar.util.StellarGravitonField.*;
 import com.protonmail.sarahszabo.stellar.util.StellarGreatFilter;
 import java.io.IOException;
-import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -197,7 +195,7 @@ public class Main {
         if (response) {
             //List for duplicate files to watch out for at the end
             var duplicateList = new ArrayList<Path>(10);
-            Files.list(Paths.get(currentDir)).parallel().map(path -> new StellarStandardFormConverter(path, path.getParent()))
+            Files.list(Paths.get(currentDir)).parallel().map(file -> new StellarStandardFormConverter(file, file.getParent()))
                     .forEach(converter -> {
                         converter.convert();
                         if (converter.hadDuplicate()) {

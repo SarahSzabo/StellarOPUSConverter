@@ -122,6 +122,18 @@ public class StellarGravitonField {
      * @throws IOException InterruptedException If something went wrong
      * @return Whether or not the operation timed out or not
      */
+    public static boolean processOP(List<String> commands) throws IOException {
+        return processOP(commands.toArray(String[]::new));
+    }
+
+    /**
+     * Launches a new process in the temp directory, and waits for its
+     * completion. Does not inherit IO.
+     *
+     * @param commands The commands to execute
+     * @throws IOException InterruptedException If something went wrong
+     * @return Whether or not the operation timed out or not
+     */
     public static boolean processOPCurrentDIR(boolean inheritIO, String... commands) throws IOException {
         return processOP(true, null, Paths.get(System.getProperty("user.dir")), commands);
     }

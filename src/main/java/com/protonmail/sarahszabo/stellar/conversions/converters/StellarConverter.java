@@ -98,7 +98,7 @@ public abstract class StellarConverter {
      * @throws IllegalStateException If the input file is not a candidate for
      * conversion
      */
-    abstract Path convert();
+    public abstract Path convert();
 
     /**
      * Converts the file with custom metadata options and stores it in the
@@ -108,7 +108,7 @@ public abstract class StellarConverter {
      * @throws IllegalStateException If the input file is not a candidate for
      * conversion
      */
-    abstract Path convert(ConverterMetadata metadata);
+    public abstract Path convert(ConverterMetadata metadata);
 
     /**
      * Gets the metadata of this file, assuming it has any. If not, returns
@@ -116,7 +116,7 @@ public abstract class StellarConverter {
      *
      * @return The metadata
      */
-    ConverterMetadata getMetadata() {
+    public ConverterMetadata getMetadata() {
         return this.metadata;
     }
 
@@ -125,7 +125,7 @@ public abstract class StellarConverter {
      *
      * @return The extension as a string
      */
-    String getFileExtension() {
+    public String getFileExtension() {
         return this.FILE_EXTENSION;
     }
 

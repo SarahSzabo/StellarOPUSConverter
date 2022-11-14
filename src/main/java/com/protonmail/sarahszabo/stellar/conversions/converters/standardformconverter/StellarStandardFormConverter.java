@@ -14,10 +14,11 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-package com.protonmail.sarahszabo.stellar.conversions.converters;
+package com.protonmail.sarahszabo.stellar.conversions.converters.standardformconverter;
 
 import com.protonmail.sarahszabo.stellar.Main;
 import static com.protonmail.sarahszabo.stellar.Main.logger;
+import com.protonmail.sarahszabo.stellar.conversions.converters.StellarConverter;
 import com.protonmail.sarahszabo.stellar.metadata.ConverterMetadata;
 import static com.protonmail.sarahszabo.stellar.util.StellarGravitonField.processOP;
 import java.io.IOException;
@@ -41,6 +42,10 @@ public class StellarStandardFormConverter extends StellarConverter {
      * rename.
      */
     private boolean hadDuplicate = false;
+    /**
+     * The ultimate filename for the file
+     */
+    private String finalFileName;
 
     /**
      * Constructs a new {@link StellarStandardFormConverter} with the specified
@@ -74,37 +79,33 @@ public class StellarStandardFormConverter extends StellarConverter {
         }
 
         System.out.println("Indexing File: " + this.INPUT_FILE);
-        //Find filename and artist for tags
-        var splitByHyphen = this.FILE_NAME.split("-");
-        var finalFilename = splitByHyphen[1].trim();
-
-        //Extract Tags
-        String artist = splitByHyphen[0].trim(), title = splitByHyphen[1].substring(0, splitByHyphen[1].lastIndexOf("."))
-                .trim();
-        System.out.println("Auto-Detected: Artist = " + artist + ", Title = " + title);
-        this.metadata = new ConverterMetadata(artist, title, "Unknown", LocalDate.MIN, null, 0);
-        try {
-            //Set Tags: kid3-cli -c "tag 1" -c "set Title "TITLE"" -c "set Artist "ARTIST"" FILENAME.EXT
-            processOP("kid3-cli", "-c", "tag 1", "-c", "set Title \'" + title + "\'",
-                    "-c", "set Artist \'" + artist + "\'", this.INPUT_FILE.toString());
-        } catch (IOException ex) {
-            Logger.getLogger(Main.class.getName()).log(Level.SEVERE, null, ex);
-            throw new IllegalStateException("Could not set tags for: " + this.INPUT_FILE, ex);
-        }
+        this.metadata = generateArtistTitle();
+        this.finalFileName = (this.metadata.getTitle() + super.FILE_EXTENSION).trim();
+        //Generates and executes the conversion
+        convertHandleConversionString();
 
         ///Finish up filename, remove space character which appears as first character sometimes
-        if (finalFilename.charAt(0) == ' ') {
-            finalFilename = finalFilename.substring(1);
+        if (this.finalFileName.charAt(0) == ' ') {
+            this.finalFileName = this.finalFileName.substring(1);
         }
-        System.out.println("Output: " + finalFilename);
-        this.DESTINATION_FILE = this.DESTINATION_FILE.getParent().resolve(finalFilename);
+        System.out.println("Indexing Output: " + this.finalFileName);
+        this.DESTINATION_FILE = this.DESTINATION_FILE.resolve(this.finalFileName);
+        //Handler for the file move and renaming operations
+        convertHandleFileMoveOperations();
+        return this.DESTINATION_FILE;
+    }
+
+    /**
+     * Handler for the file move and renaming operations.
+     */
+    private void convertHandleFileMoveOperations() {
         //Rename on Disk
         if (Files.exists(this.DESTINATION_FILE)) {
             this.hadDuplicate = true;
             //File Already Exists, rename
-            finalFilename = this.FILE_NAME_NO_EXTENSION + " (" + artist + ")" + this.FILE_EXTENSION;
-            this.DESTINATION_FILE = this.DESTINATION_FILE.getParent().resolve(finalFilename);
-            logger.info("Duplicate Observed & Corrected: " + finalFilename);
+            this.finalFileName = super.FILE_NAME_NO_EXTENSION + " (" + this.metadata.getArtist() + ")" + super.FILE_EXTENSION;
+            super.DESTINATION_FILE = super.DESTINATION_FILE.getParent().resolve(this.finalFileName);
+            logger.info("Duplicate Observed & Corrected: " + this.finalFileName);
         }
         try {
             Files.move(this.INPUT_FILE, this.DESTINATION_FILE);
@@ -112,13 +113,44 @@ public class StellarStandardFormConverter extends StellarConverter {
             Logger.getLogger(Main.class.getName()).log(Level.SEVERE, null, ex);
             throw new IllegalStateException("Something went wrong with renaming: " + this.INPUT_FILE, ex);
         }
-        return this.DESTINATION_FILE;
+    }
+
+    /**
+     * Handles convert's conversion string step.
+     */
+    private void convertHandleConversionString() {
+        try {
+            //Set Tags: kid3-cli -c "tag 1" -c "set Title "TITLE"" -c "set Artist "ARTIST"" FILENAME.EXT
+            /*processOP("kid3-cli", "-c", "tag 2", "-c", "set Title \'" + this.metadata.getTitle() + "\'",
+                    "-c", "set Artist \'" + this.metadata.getArtist() + "\'", this.INPUT_FILE.toString());*/
+            processOP(new KID3CommandBuilder(this.INPUT_FILE).selectTag(2).setTitle(this.metadata.getTitle())
+                    .setArtist(this.metadata.getArtist()).Tag2To2Point4().build());
+        } catch (IOException ex) {
+            Logger.getLogger(Main.class.getName()).log(Level.SEVERE, null, ex);
+            throw new IllegalStateException("Could not set tags for: " + this.INPUT_FILE, ex);
+        }
     }
 
     @Override
-    Path convert(ConverterMetadata metadata) {
+    public Path convert(ConverterMetadata metadata) {
         throw new UnsupportedOperationException("This class looks for mismatched file names and tags and corrects those errors,"
                 + " it does not use metadata to construct a file.");
+    }
+
+    /**
+     * Generates a {@link ConverterMetadata} from the artist title combination.
+     *
+     * @return The metadata
+     */
+    private ConverterMetadata generateArtistTitle() {
+        //Find filename and artist for tags
+        var splitByHyphen = this.FILE_NAME.split("-");
+
+        //Extract Tags
+        String artist = splitByHyphen[0].trim(), title = splitByHyphen[1].substring(0, splitByHyphen[1].lastIndexOf("."))
+                .trim();
+        System.out.println("Auto-Detected: Artist = " + artist + ", Title = " + title);
+        return new ConverterMetadata(artist, title, "Unknown", LocalDate.MIN, null, 0);
     }
 
     /**
