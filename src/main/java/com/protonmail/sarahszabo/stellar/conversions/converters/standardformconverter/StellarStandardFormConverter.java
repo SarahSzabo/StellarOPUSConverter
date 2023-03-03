@@ -24,7 +24,6 @@ import static com.protonmail.sarahszabo.stellar.util.StellarGravitonField.proces
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.time.LocalDate;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -36,6 +35,16 @@ import java.util.logging.Logger;
  * @author Sarah Szabo <SarahSzabo@Protonmail.com>
  */
 public class StellarStandardFormConverter extends StellarConverter {
+
+    /**
+     * Determines whether or not a filename matches the currently supported
+     * types or not.
+     *
+     * @return The boolean
+     */
+    public static boolean isFiletypeCandidate(String filename) {
+        return filename.matches(".*\\.(mp3|opus|ogg|wav|aac|flac|m4a)");
+    }
 
     /**
      * Whether or not we identified a duplicate in the destination and had to
@@ -55,43 +64,82 @@ public class StellarStandardFormConverter extends StellarConverter {
      * @param destinationFolder The folder to save the file in
      */
     public StellarStandardFormConverter(Path inputFile, Path destinationFolder) {
-        super(inputFile, destinationFolder, inputFile.getFileName().toString()
-                .substring(inputFile.getFileName().toString().lastIndexOf('.')), true);
+        //Ternery is a bugfix for Linux OS's that do not require file names to be present
+        super(inputFile, destinationFolder, inputFile.getFileName().toString().contains(".")
+                ? inputFile.getFileName().toString().substring(inputFile.getFileName().toString().lastIndexOf('.')) : "", true);
+    }
+
+    /**
+     * Determines whether or not a filename matches the currently supported
+     * types or not.
+     *
+     * @return The boolean
+     */
+    public boolean isFiletypeCandidate() {
+        return isFiletypeCandidate(this.FILE_NAME);
     }
 
     @Override
     public boolean isConversionCandidate() {
-        return this.FILE_NAME.matches("[^-]*-[^-]*");
+        //Matches anything but "-" with a - and anything but "-" a . and then one or more text characters.
+        return this.FILE_NAME.matches("[^-]*-[^-]*\\.mp3|opus|ogg|wav|aac");
+    }
+
+    /**
+     * Handles the decision logic for the tags to set them into standard form.
+     * Preserves if both tags exist, deletes tag1. If tag1 but not tag2 exist,
+     * copies tag1->tag2 and deletes tag1. If tag2 exists, but not tag1, then
+     * does nothing.
+     *
+     * @param tag1 The first tag
+     * @param tag2 The second tag
+     */
+    private void convertHandleTagDecisionLogic(String tag1, String tag2, Path inputFile) {
+        if (KID3CommandBuilder.isTagIDV3Valid(tag1) && KID3CommandBuilder.isTagIDV3Valid(tag2)) {
+            var s = new KID3CommandBuilder(inputFile).deleteTag(1).buildAndExecuteString();
+            System.out.println(s);
+        } else if (KID3CommandBuilder.isTagIDV3Valid(tag1) && !KID3CommandBuilder.isTagIDV3Valid(tag2)) {
+            var s = new KID3CommandBuilder(inputFile).copyTag(1, 2).deleteTag(1).buildAndExecuteString();
+        }
     }
 
     /**
      * Converts the AUTHOR - TITLE.EXTENSION track to the proper form ->
-     * TITLE.EXTENSION.
+     * TITLE.EXTENSION. Also checks miscellanious details about the file to
+     * ensure that the tags are set properly for compliance with tagging
+     * proceedures whether or not this routine converted the filename.
      *
      * @return The path to the newly converted file (will rename if discovers
      * duplicates)
      */
     @Override
     public Path convert() {
-        if (!isConversionCandidate()) {
-            throw new IllegalStateException("File: " + this.INPUT_FILE + " is not a candidate for"
-                    + " standard-form conversion to TITLE.EXTENSION.");
-        }
+        //Use this temp variable just in case we get a conversion and the filename changes
+        var inputFileInCaseOfConversion = this.INPUT_FILE;
+        if (isConversionCandidate()) {
+            System.out.println("Indexing File: " + this.INPUT_FILE);
+            this.metadata = generateArtistTitle();
+            this.finalFileName = (this.metadata.getTitle() + super.FILE_EXTENSION).trim();
+            //Generates and executes the conversion
+            convertHandleConversionString();
 
-        System.out.println("Indexing File: " + this.INPUT_FILE);
-        this.metadata = generateArtistTitle();
-        this.finalFileName = (this.metadata.getTitle() + super.FILE_EXTENSION).trim();
-        //Generates and executes the conversion
-        convertHandleConversionString();
-
-        ///Finish up filename, remove space character which appears as first character sometimes
-        if (this.finalFileName.charAt(0) == ' ') {
-            this.finalFileName = this.finalFileName.substring(1);
+            ///Finish up filename, remove space character which appears as first character sometimes
+            if (this.finalFileName.charAt(0) == ' ') {
+                this.finalFileName = this.finalFileName.substring(1);
+            }
+            System.out.println("Indexing Output: " + this.finalFileName);
+            this.DESTINATION_FILE = this.INPUT_FILE.getParent().resolve(this.finalFileName);
+            //Handler for the file move and renaming operations
+            convertHandleFileMoveOperations();
+            inputFileInCaseOfConversion = this.DESTINATION_FILE;
         }
-        System.out.println("Indexing Output: " + this.finalFileName);
-        this.DESTINATION_FILE = this.DESTINATION_FILE.resolve(this.finalFileName);
-        //Handler for the file move and renaming operations
-        convertHandleFileMoveOperations();
+        if (isFiletypeCandidate()) {
+            //Do miscellanious checks on IDV3 Tags This runs whether there was a conversion or not
+            //Check That tag 2 is the primary tag and delete tag 1 if it exists, copying if tag2 does not exist, but 1 does
+            var tag2 = new KID3CommandBuilder(inputFileInCaseOfConversion).selectTag(2).get().buildAndExecuteString();
+            var tag1 = new KID3CommandBuilder(inputFileInCaseOfConversion).selectTag(1).get().buildAndExecuteString();
+            convertHandleTagDecisionLogic(tag1, tag2, inputFileInCaseOfConversion);
+        }
         return this.DESTINATION_FILE;
     }
 
@@ -150,7 +198,9 @@ public class StellarStandardFormConverter extends StellarConverter {
         String artist = splitByHyphen[0].trim(), title = splitByHyphen[1].substring(0, splitByHyphen[1].lastIndexOf("."))
                 .trim();
         System.out.println("Auto-Detected: Artist = " + artist + ", Title = " + title);
-        return new ConverterMetadata(artist, title, "Unknown", LocalDate.MIN, null, 0);
+        return new ConverterMetadata(artist, title,
+                ConverterMetadata.DEFAULT_METADATA.getCreatedBy(), ConverterMetadata.DEFAULT_METADATA.getStellarIndexDate(),
+                ConverterMetadata.DEFAULT_METADATA.getAlbumArtPath(), ConverterMetadata.DEFAULT_METADATA.getBitrate());
     }
 
     /**

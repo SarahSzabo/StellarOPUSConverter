@@ -162,6 +162,29 @@ public class Main {
      * Scans the current directory for malformatted filenames: multiple "-"
      * characters. Exits if it finds one.
      */
+    private static String scanForMalformattedFilenamesString(Path currentDir) throws IOException {
+        System.out.println("\nBeginning Scan for Malformatted Filenames");
+        var files = Files.list(currentDir);
+        var malformedList = new ArrayList<Path>(100);
+        files.parallel().map(path -> new StellarStandardFormConverter(path, path.getParent()))
+                .filter(converter -> !converter.isConversionCandidate())
+                .forEach(converter -> malformedList.add(converter.getInputFile()));
+        if (!malformedList.isEmpty()) {
+            StellarGravitonField.hyperlightMessage("The following files are malformed (multiple \"-\" characters):\n\n"
+                    + malformedList.stream().map(Path::toString).collect(Collectors.joining("\n"))
+                    + "\n\nIndexing Disabled for these files");
+            return StellarGravitonField.hyperlightMessageString("The following files are malformed (multiple \"-\" characters):\n\n"
+                    + malformedList.stream().map(Path::toString).collect(Collectors.joining("\n"))
+                    + "\n\nIndexing Disabled for these files");
+        }
+        System.out.println("Scan completed. No malformed filenames detected\n");
+        return "Scan completed. No malformed filenames detected\n";
+    }
+
+    /**
+     * Scans the current directory for malformatted filenames: multiple "-"
+     * characters. Exits if it finds one.
+     */
     private static void scanForMalformattedFilenames(Path currentDir) throws IOException {
         System.out.println("\nBeginning Scan for Malformatted Filenames");
         var files = Files.list(currentDir);
@@ -170,9 +193,9 @@ public class Main {
                 .filter(converter -> !converter.isConversionCandidate())
                 .forEach(converter -> malformedList.add(converter.getInputFile()));
         if (!malformedList.isEmpty()) {
-            StellarGravitonField.messageThenExit("The following files are malformed (multiple \"-\" characters):\n\n"
+            StellarGravitonField.hyperlightMessage("The following files are malformed (multiple \"-\" characters):\n\n"
                     + malformedList.stream().map(Path::toString).collect(Collectors.joining("\n"))
-                    + "\n\nIndexing Aborted");
+                    + "\n\nIndexing Disabled for these files");
         } else {
             System.out.println("Scan completed. No malformed filenames detected\n");
         }
@@ -186,16 +209,19 @@ public class Main {
         //TODO: If the title tag has ARTIST - TITLE in it, auto-correct to just TITLE, same for the artist tag field
         var currentDir = System.getProperty("user.dir");
         System.out.println("Current Directory: " + currentDir);
-        //Scan for malformatted filenames <multiple "-">
-        scanForMalformattedFilenames(Paths.get(currentDir));
-
+        //Scan for malformatted filenames <multiple "-"> / no file extension. This prints a list to the terminal if there are detected
+        var malformatted = scanForMalformattedFilenamesString(Paths.get(currentDir));
         //UI for confirmation
         var response = StellarCLIUtils.showConfirmationDialog("Current Directory: " + currentDir
+                + "\n\n" + malformatted
                 + "\n\nAre all the files in this folder in ARTIST - FILENAME.EXTENSION format and are ready to be changed?");
         if (response) {
             //List for duplicate files to watch out for at the end
             var duplicateList = new ArrayList<Path>(10);
-            Files.list(Paths.get(currentDir)).parallel().map(file -> new StellarStandardFormConverter(file, file.getParent()))
+            Files.list(Paths.get(currentDir)).parallel()
+                    //No directories
+                    .filter(path -> !Files.isDirectory(path) && StellarStandardFormConverter.isFiletypeCandidate(path.getFileName().toString()))
+                    .map(file -> new StellarStandardFormConverter(file, file.getParent()))
                     .forEach(converter -> {
                         converter.convert();
                         if (converter.hadDuplicate()) {

@@ -48,6 +48,16 @@ public class StellarGravitonField {
      *
      * @param message The message to print
      */
+    public static final String hyperlightMessageString(Object message) {
+        return ("\n\n" + MESSAGE_FIELD_SEPERATOR + "\n" + message
+                + "\n" + MESSAGE_FIELD_SEPERATOR + "\n\n");
+    }
+
+    /**
+     * Prints out a large message with horizontal bars for seperators.
+     *
+     * @param message The message to print
+     */
     public static final void hyperlightMessage(Object message) {
         System.out.println("\n\n" + MESSAGE_FIELD_SEPERATOR + "\n" + message
                 + "\n" + MESSAGE_FIELD_SEPERATOR + "\n");

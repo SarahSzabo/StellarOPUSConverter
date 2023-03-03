@@ -155,7 +155,7 @@ public enum StellarMode {
                 }
             }
             Logger.getLogger(StellarMode.class.getName()).info("\n\nFinished Files: " + text);
-            deleteOriginalFiles(List.of(path));
+            deleteOriginalFilesWithConfirmation(List.of(path));
         }
     },
     /**
@@ -245,7 +245,7 @@ public enum StellarMode {
      *
      * @param paths The collection of paths to delete
      */
-    private static void deleteOriginalFiles(Collection<Path> paths) {
+    private static void deleteOriginalFilesWithConfirmation(Collection<Path> paths) {
         if (StellarCLIUtils.showConfirmationDialog("Delete Original Files? \n\n" + paths.toString())) {
             for (var path : paths) {
                 FileUtils.deleteQuietly(path.toFile());
@@ -276,7 +276,7 @@ public enum StellarMode {
             Logger.getLogger(StellarMode.class.getName()).info("\n\n\nCompleted Output Files:");
             finalPaths.stream().forEachOrdered(path -> System.out.println(path));
             //Delete Original Files
-            deleteOriginalFiles(paths.get());
+            deleteOriginalFilesWithConfirmation(paths.get());
             try {
                 StellarHyperspace.initiateFalseVacuum();
             } catch (InterruptedException ex) {

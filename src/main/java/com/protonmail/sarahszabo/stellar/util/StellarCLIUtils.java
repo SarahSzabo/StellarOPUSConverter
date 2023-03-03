@@ -8,7 +8,6 @@ package com.protonmail.sarahszabo.stellar.util;
 import com.protonmail.sarahszabo.stellar.StellarDiskManager;
 import com.protonmail.sarahszabo.stellar.metadata.ConverterMetadataBuilder;
 import com.protonmail.sarahszabo.stellar.metadata.MetadataType;
-import com.protonmail.sarahszabo.stellar.util.StellarGravitonField;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -104,6 +103,7 @@ public enum StellarCLIUtils {
                     var image = new Image(Files.newInputStream(StellarDiskManager.SYSTEM_ICON), 300, 500, true, true);
                     stage.getIcons().add(image);
                     stage.setResizable(true);
+                    stage.setMaximized(true);
                     alert.setGraphic(new ImageView(image));
                     var response = alert.showAndWait();
                     queue.put(response);

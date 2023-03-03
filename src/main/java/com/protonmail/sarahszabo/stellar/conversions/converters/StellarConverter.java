@@ -32,9 +32,30 @@ import java.nio.file.Path;
  */
 public abstract class StellarConverter {
 
+    /**
+     * The input file on the filesystem from which we will get data.
+     */
     protected final Path INPUT_FILE;
+    /**
+     * The destination file which we will create.
+     */
     protected Path DESTINATION_FILE;
-    protected final String FILE_NAME, FILE_NAME_NO_EXTENSION, FILE_EXTENSION;
+    /**
+     * The name of the file.
+     */
+    protected final String FILE_NAME,
+            /**
+             * The name of the file without the file extension.
+             */
+            FILE_NAME_NO_EXTENSION,
+            /**
+             * The file extension (should it exist; else empty as a string.
+             * INCLUDES THE DOT '.'.
+             */
+            FILE_EXTENSION;
+    /**
+     * The metadata of this file.
+     */
     protected ConverterMetadata metadata;
 
     /**
@@ -60,9 +81,14 @@ public abstract class StellarConverter {
         this.INPUT_FILE = inputFile;
         //Get the file extension of this file and set it as both the extension and destination file path.
         this.FILE_NAME = this.INPUT_FILE.getFileName().toString();
-        this.FILE_NAME_NO_EXTENSION = this.FILE_NAME.substring(0, this.FILE_NAME.lastIndexOf("."));
+        //Assuming file extension might not exist (Linux)
+        if (!fileExtension.isEmpty()) {
+            this.FILE_NAME_NO_EXTENSION = this.FILE_NAME.substring(0, this.FILE_NAME.lastIndexOf("."));
+        } else {
+            this.FILE_NAME_NO_EXTENSION = this.FILE_NAME;
+        }
         this.FILE_EXTENSION = fileExtension;
-        this.DESTINATION_FILE = destinationFolder.resolve(this.FILE_NAME_NO_EXTENSION + "." + this.FILE_EXTENSION);
+        this.DESTINATION_FILE = destinationFolder.resolve(this.FILE_NAME_NO_EXTENSION + this.FILE_EXTENSION);
 
         if (metadataSearch) {
             //Get metadata from either filename or tags
