@@ -13,7 +13,7 @@
                 <exec.args>${exec.vmArgs} -classpath %classpath ${exec.mainClass} ${exec.appArgs}</exec.args>
                 <exec.executable>java</exec.executable>
                 <exec.workingdir>/home/sarah/NetBeansProjects/StellarOPUSConverter-master</exec.workingdir>
-                <exec.appArgs>-TO_STANDARD_FORM</exec.appArgs>
+                <exec.appArgs>-CL</exec.appArgs>
                 <exec.vmArgs></exec.vmArgs>
                 <exec.mainClass>com.protonmail.sarahszabo.stellar.Main</exec.mainClass>
             </properties>
@@ -32,7 +32,7 @@
                 <exec.executable>java</exec.executable>
                 <jpda.listen>true</jpda.listen>
                 <exec.workingdir>/home/sarah/NetBeansProjects/StellarOPUSConverter-master</exec.workingdir>
-                <exec.appArgs>-TO_STANDARD_FORM</exec.appArgs>
+                <exec.appArgs>-CL</exec.appArgs>
                 <exec.vmArgs>-agentlib:jdwp=transport=dt_socket,server=n,address=${jpda.address}</exec.vmArgs>
                 <exec.mainClass>com.protonmail.sarahszabo.stellar.Main</exec.mainClass>
             </properties>
@@ -50,7 +50,7 @@
                 <exec.args>${exec.vmArgs} -classpath %classpath ${exec.mainClass} ${exec.appArgs}</exec.args>
                 <exec.executable>java</exec.executable>
                 <exec.workingdir>/home/sarah/NetBeansProjects/StellarOPUSConverter-master</exec.workingdir>
-                <exec.appArgs>-TO_STANDARD_FORM</exec.appArgs>
+                <exec.appArgs>-CL</exec.appArgs>
                 <exec.vmArgs></exec.vmArgs>
                 <exec.mainClass>com.protonmail.sarahszabo.stellar.Main</exec.mainClass>
             </properties>

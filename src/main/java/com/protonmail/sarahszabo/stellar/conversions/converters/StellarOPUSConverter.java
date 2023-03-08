@@ -538,13 +538,13 @@ public class StellarOPUSConverter {
 
             //Check if Image Already Exists, if not, generate image
             //Are we adding a picture from .opus or a video file, in one case ask user for picture, in other case grab fom video
-            if (!Files.exists(imageFilePath)) {
+            if (!Files.exists(imageFilePath) || Files.size(imageFilePath) == 0) {
                 //ffmpeg -ss 25 -i input.mp4 -qscale:v 2 -frames:v 1 -huffman optimal output.jpg
                 processOP("ffmpeg", "-ss", "30", "-i", this.originalFilePath.getFileName().toString(), "-y", "-qscale:v", "2",
                         "-frames:v", "1", "-huffman", "optimal", getImageFileName());
                 //Copy Image to Picture Output Folder
                 Files.copy(newPath(StellarDiskManager.getTempDirectory(), getImageFileName()),
-                        imageFilePath);
+                        imageFilePath, StandardCopyOption.REPLACE_EXISTING);
             }
             this.metadata.albumArtPath(imageFilePath);
         }

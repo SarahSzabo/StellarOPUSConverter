@@ -36,6 +36,8 @@ import java.util.logging.Logger;
  */
 public class StellarStandardFormConverter extends StellarConverter {
 
+    private static final String SUPPORTED_FILETYPE_REGEX = "mp3|opus|ogg|wav|aac|flac|m4a|mkv|webm|mp4";
+
     /**
      * Determines whether or not a filename matches the currently supported
      * types or not.
@@ -43,7 +45,7 @@ public class StellarStandardFormConverter extends StellarConverter {
      * @return The boolean
      */
     public static boolean isFiletypeCandidate(String filename) {
-        return filename.matches(".*\\.(mp3|opus|ogg|wav|aac|flac|m4a)");
+        return filename.matches(".*\\.(" + SUPPORTED_FILETYPE_REGEX + ")");
     }
 
     /**
@@ -82,7 +84,7 @@ public class StellarStandardFormConverter extends StellarConverter {
     @Override
     public boolean isConversionCandidate() {
         //Matches anything but "-" with a - and anything but "-" a . and then one or more text characters.
-        return this.FILE_NAME.matches("[^-]*-[^-]*\\.mp3|opus|ogg|wav|aac");
+        return this.FILE_NAME.matches("[^-]*-[^-]*\\.(" + SUPPORTED_FILETYPE_REGEX + ")");
     }
 
     /**
